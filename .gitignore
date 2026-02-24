@@ -1,0 +1,38 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+
+# IDE
+.idea/
+*.iml
+*.iws
+*.ipr
+.classpath
+.project
+.settings/
+*.launch
+
+# VS Code
+.vscode/
+
+# Node / Frontend
+extractor-frontend/node_modules/
+extractor-frontend/dist/
+
+# Logs
+*.log
+logs/
+
+# Docker
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Repo clones (stored outside workspace; see extractor.repos config)
+/repos/

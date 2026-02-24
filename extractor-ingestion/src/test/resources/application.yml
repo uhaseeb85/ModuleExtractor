@@ -1,0 +1,23 @@
+# Test application properties for extractor-ingestion integration tests.
+# Neo4j connection is overridden at runtime by @DynamicPropertySource.
+spring:
+  neo4j:
+    uri: bolt://localhost:7687
+    authentication:
+      username: neo4j
+      password: ''
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+
+extractor:
+  graph:
+    batch-size: 10
+  ingestion:
+    cron: "-"   # Disable scheduled sync in tests
+  git:
+    cloneOnStartup: false
+
+logging:
+  level:
+    com.extractor: DEBUG

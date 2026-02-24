@@ -1,0 +1,60 @@
+spring:
+  application:
+    name: extractor-api
+
+  # Neo4j connection
+  neo4j:
+    uri: ${NEO4J_URI:bolt://localhost:7687}
+    authentication:
+      username: ${NEO4J_USERNAME:neo4j}
+      password: ${NEO4J_PASSWORD:extractor123}
+
+  # PostgreSQL (placeholder – not actively used in Phase 1)
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/extractor}
+    username: ${SPRING_DATASOURCE_USERNAME:extractor}
+    password: ${SPRING_DATASOURCE_PASSWORD:extractor123}
+    driver-class-name: org.postgresql.Driver
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+
+  # Jackson
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# Extractor configuration
+extractor:
+  repos: []        # Populated via EXTRACTOR_REPOS_CONFIG file or overridden per environment
+  git:
+    ssh-key-path: ${EXTRACTOR_GIT_SSH_KEY_PATH:}
+    clone-on-startup: true
+  graph:
+    batch-size: 100
+  ingestion:
+    cron: "0 0 2 * * *"   # 2am daily
+
+# Logging
+logging:
+  level:
+    com.extractor: DEBUG
+    org.springframework.data.neo4j: INFO
+    org.neo4j: WARN
