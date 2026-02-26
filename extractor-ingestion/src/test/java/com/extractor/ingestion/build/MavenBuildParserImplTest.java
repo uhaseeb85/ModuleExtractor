@@ -1,14 +1,11 @@
 package com.extractor.ingestion.build;
 
 import com.extractor.core.enums.BuildTool;
-import com.extractor.core.model.DependsOnEdge;
-import com.extractor.core.model.RepoConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,8 +23,6 @@ class MavenBuildParserImplTest {
     Path projectDir;
 
     private final MavenBuildParserImpl parser = new MavenBuildParserImpl();
-    private final RepoConfig repoConfig = new RepoConfig(
-            "test-project", "file://local", "main", BuildTool.MAVEN, projectDir);
 
     // ── Tests ──────────────────────────────────────────────────────
 

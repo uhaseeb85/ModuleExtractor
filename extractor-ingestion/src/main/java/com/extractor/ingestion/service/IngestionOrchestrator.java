@@ -149,9 +149,9 @@ public class IngestionOrchestrator {
      * (Maven) or {@code build.gradle} / {@code build.gradle.kts} (Gradle).
      * When detection is inconclusive, {@code defaultBuildTool} is used.
      *
-     * @param directoryPath   Absolute path to scan.
+     * @param directoryPath    Absolute path to scan.
      * @param defaultBuildTool Fallback build tool when auto-detection fails.
-     * @param defaultBranch   Branch name recorded for each repo.
+     * @param branch           Branch name recorded for each repo.
      * @return Immutable list of {@link RepoConfig} records that were registered
      *         (already-registered repos are silently skipped).
      */
