@@ -17,6 +17,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -26,6 +28,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Stream;
 
 /**
  * Orchestrates the full ingestion pipeline:
@@ -133,6 +136,90 @@ public class IngestionOrchestrator {
         configuredRepos.add(config);
         log.info("Registered new repo '{}' ({})", config.name(), config.url());
         return config;
+    }
+
+    /**
+     * Scans {@code directoryPath} for Git repositories and registers each one.
+     *
+     * <p>The directory is treated as a container of repositories: every
+     * immediate sub-directory that contains a {@code .git} folder is added.
+     * If the directory itself is a Git repository it is also added.
+     *
+     * <p>Build tool is auto-detected from the presence of {@code pom.xml}
+     * (Maven) or {@code build.gradle} / {@code build.gradle.kts} (Gradle).
+     * When detection is inconclusive, {@code defaultBuildTool} is used.
+     *
+     * @param directoryPath    Absolute path to scan.
+     * @param defaultBuildTool Fallback build tool when auto-detection fails.
+     * @param branch           Branch name recorded for each repo.
+     * @return Immutable list of {@link RepoConfig} records that were registered
+     *         (already-registered repos are silently skipped).
+     */
+    public List<RepoConfig> scanLocalDirectory(String directoryPath,
+                                               BuildTool defaultBuildTool,
+                                               String branch) {
+        Path root = Path.of(directoryPath);
+        if (!Files.isDirectory(root)) {
+            throw new IllegalArgumentException("Not a directory: " + directoryPath);
+        }
+
+        List<Path> repoDirs = new ArrayList<>();
+
+        // If the root itself is a git repo, treat it as a single repo
+        if (Files.isDirectory(root.resolve(".git"))) {
+            repoDirs.add(root);
+        } else {
+            // Otherwise scan immediate sub-directories
+            try (Stream<Path> children = Files.list(root)) {
+                children.filter(p -> {
+                    try {
+                        return Files.isDirectory(p.resolve(".git"));
+                    } catch (Exception ex) {
+                        log.debug("Skipping '{}': {}", p, ex.getMessage());
+                        return false;
+                    }
+                }).forEach(repoDirs::add);
+            } catch (IOException e) {
+                throw new IllegalArgumentException("Cannot list directory: " + directoryPath, e);
+            }
+        }
+
+        if (repoDirs.isEmpty()) {
+            log.warn("No Git repositories found under '{}'", directoryPath);
+        }
+
+        List<RepoConfig> registered = new ArrayList<>();
+        for (Path repoDir : repoDirs) {
+            String name = repoDir.getFileName().toString();
+            BuildTool buildTool = detectBuildTool(repoDir, defaultBuildTool);
+            // Use the local path as the URL so the record is self-describing;
+            // syncRepo handles already-cloned dirs by reading the current HEAD.
+            RepoConfig config = new RepoConfig(name, repoDir.toAbsolutePath().toString(),
+                    branch, buildTool, repoDir.toAbsolutePath().toString());
+            try {
+                addRepo(config);
+                registered.add(config);
+                log.info("Registered local repo '{}' (buildTool={}) from '{}'",
+                        name, buildTool, repoDir);
+            } catch (IllegalArgumentException e) {
+                // Already registered — skip silently
+                log.debug("Skipping already-registered repo '{}'", name);
+            }
+        }
+        return List.copyOf(registered);
+    }
+
+    // ── Build-tool auto-detection ────────────────────────────────────────
+
+    private BuildTool detectBuildTool(Path repoDir, BuildTool fallback) {
+        if (Files.exists(repoDir.resolve("pom.xml"))) {
+            return BuildTool.MAVEN;
+        }
+        if (Files.exists(repoDir.resolve("build.gradle"))
+                || Files.exists(repoDir.resolve("build.gradle.kts"))) {
+            return BuildTool.GRADLE;
+        }
+        return fallback;
     }
 
     /**

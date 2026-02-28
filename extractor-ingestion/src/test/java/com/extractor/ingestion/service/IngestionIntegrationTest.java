@@ -1,6 +1,7 @@
 package com.extractor.ingestion.service;
 
 import com.extractor.core.enums.BuildTool;
+import com.extractor.core.enums.SyncStatus;
 import com.extractor.core.model.RepoConfig;
 import com.extractor.graph.repository.ClassEntityRepository;
 import com.extractor.ingestion.model.SyncJobStatus;
@@ -65,17 +66,19 @@ class IngestionIntegrationTest {
 
     @Test
     void singleRepoSyncParsesJavaFiles() {
-        String jobId = orchestrator.triggerSingleRepoSync("local-test-repo");
+        String jobId = orchestrator.triggerSingleRepoSync("local-test-repo")
+                .map(SyncJobStatus::getJobId)
+                .orElseThrow(() -> new AssertionError("Repo 'local-test-repo' not found"));
         assertThat(jobId).isNotBlank();
 
         // Wait until job completes (max 30s)
         await().atMost(30, TimeUnit.SECONDS).untilAsserted(() -> {
             SyncJobStatus status = orchestrator.getJobStatus(jobId).orElseThrow();
-            assertThat(status.getStatus()).isIn("COMPLETED", "FAILED");
+            assertThat(status.getStatus()).isIn(SyncStatus.COMPLETED, SyncStatus.FAILED);
         });
 
         SyncJobStatus finalStatus = orchestrator.getJobStatus(jobId).orElseThrow();
-        assertThat(finalStatus.getStatus()).isEqualTo("COMPLETED");
+        assertThat(finalStatus.getStatus()).isEqualTo(SyncStatus.COMPLETED);
 
         // The com.example.Widget class should now be in the graph
         assertThat(classRepository.findByFullyQualifiedName("com.example.Widget")).isPresent();

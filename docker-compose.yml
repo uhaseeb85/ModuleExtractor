@@ -63,6 +63,16 @@ services:
       - "8081:8080"
     volumes:
       - repo_clones:/repos
+      # ── Local directory scanning ──────────────────────────────────────
+      # To use "Scan Local Directory", bind-mount the parent folder of your
+      # local git repos into the container at /local-repos (or any path):
+      #
+      #   - /absolute/path/on/your/host:/local-repos:ro
+      #
+      # Then use that container path in the UI or API:
+      #   POST /api/v1/ingestion/scan-directory
+      #   { "directoryPath": "/local-repos" }
+      # ─────────────────────────────────────────────────────────────────
     depends_on:
       neo4j:
         condition: service_healthy

@@ -2,6 +2,7 @@ package com.extractor.api.controller;
 
 import com.extractor.api.dto.AddRepoRequest;
 import com.extractor.api.dto.RepoSummaryResponse;
+import com.extractor.api.dto.ScanDirectoryRequest;
 import com.extractor.api.dto.SyncJobResponse;
 import com.extractor.core.enums.BuildTool;
 import com.extractor.core.model.RepoConfig;
@@ -128,6 +129,47 @@ public class IngestionController {
             }
 
             return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("repo", req.getName()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * POST /api/v1/ingestion/scan-directory
+     * Scan a local filesystem directory for Git repositories and register each one.
+     * The directory may itself be a Git repo, or contain multiple Git repos as
+     * immediate sub-directories.  Build tool is auto-detected (pom.xml → Maven,
+     * build.gradle → Gradle) with the supplied {@code buildTool} as a fallback.
+     * Optionally pass {@code ?sync=true} to trigger ingestion after registration.
+     */
+    @PostMapping("/scan-directory")
+    public ResponseEntity<?> scanDirectory(@Valid @RequestBody ScanDirectoryRequest req,
+                                           @RequestParam(value = "sync", defaultValue = "false") boolean sync) {
+        try {
+            List<com.extractor.core.model.RepoConfig> found = orchestrator.scanLocalDirectory(
+                    req.getDirectoryPath(),
+                    BuildTool.valueOf(req.getBuildTool()),
+                    req.getBranch()
+            );
+
+            if (found.isEmpty()) {
+                return ResponseEntity.ok(Map.of(
+                        "message", "No new Git repositories found under: " + req.getDirectoryPath(),
+                        "registered", List.of()
+                ));
+            }
+
+            List<String> names = found.stream().map(com.extractor.core.model.RepoConfig::name).toList();
+
+            if (sync) {
+                SyncJobStatus job = orchestrator.triggerFullSync();
+                return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
+                        "registered", names,
+                        "syncJobId", job.getJobId()
+                ));
+            }
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("registered", names));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
