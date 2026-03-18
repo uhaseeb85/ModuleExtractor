@@ -60,11 +60,11 @@ class IngestionIntegrationTest {
 
         // Wait until job completes (max 30s)
         await().atMost(30, TimeUnit.SECONDS).untilAsserted(() -> {
-            SyncJobStatus status = orchestrator.getJobStatus(jobId).orElseThrow();
+            SyncJobStatus status = orchestrator.getJobStatus(jobId).orElseThrow(() -> new AssertionError("Job status not found"));
             assertThat(status.getStatus()).isIn(SyncStatus.COMPLETED, SyncStatus.FAILED);
         });
 
-        SyncJobStatus finalStatus = orchestrator.getJobStatus(jobId).orElseThrow();
+        SyncJobStatus finalStatus = orchestrator.getJobStatus(jobId).orElseThrow(() -> new AssertionError("Final job status not found"));
         assertThat(finalStatus.getStatus()).isEqualTo(SyncStatus.COMPLETED);
 
         // The com.example.Widget class should now be in the graph

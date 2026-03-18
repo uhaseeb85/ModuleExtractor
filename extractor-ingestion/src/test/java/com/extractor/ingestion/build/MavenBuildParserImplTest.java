@@ -1,6 +1,7 @@
 package com.extractor.ingestion.build;
 
 import com.extractor.core.enums.BuildTool;
+import com.extractor.core.model.RepoConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

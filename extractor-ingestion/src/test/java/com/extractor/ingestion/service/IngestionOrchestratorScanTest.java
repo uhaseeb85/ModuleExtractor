@@ -12,8 +12,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -37,12 +40,12 @@ class IngestionOrchestratorScanTest {
     @BeforeEach
     void setUp() {
         ExtractorProperties props = mock(ExtractorProperties.class);
-        when(props.toRepoConfigs()).thenReturn(List.of());
+        when(props.toRepoConfigs()).thenReturn(Collections.emptyList());
 
         orchestrator = new IngestionOrchestrator(
                 mock(RepoScanner.class),
                 mock(JavaSourceParserImpl.class),
-                List.of(mock(BuildFileParser.class)),
+                Arrays.asList(mock(BuildFileParser.class)),
                 mock(GraphBuilder.class),
                 props
         );
@@ -64,17 +67,17 @@ class IngestionOrchestratorScanTest {
     void rootGitRepoIsRegistered() throws IOException {
         // Make tempDir itself a git repo
         Files.createDirectory(tempDir.resolve(".git"));
-        Files.writeString(tempDir.resolve("pom.xml"), "<project/>");
+        Files.write(tempDir.resolve("pom.xml"), "<project/>".getBytes(StandardCharsets.UTF_8));
 
         List<RepoConfig> result = orchestrator.scanLocalDirectory(
                 tempDir.toString(), BuildTool.GRADLE, "main");
 
         assertThat(result).hasSize(1);
         RepoConfig cfg = result.get(0);
-        assertThat(cfg.name()).isEqualTo(tempDir.getFileName().toString());
-        assertThat(cfg.buildTool()).isEqualTo(BuildTool.MAVEN);  // auto-detected
-        assertThat(cfg.localPath()).isEqualTo(tempDir.toAbsolutePath().toString());
-        assertThat(cfg.url()).isEqualTo(tempDir.toAbsolutePath().toString());
+        assertThat(cfg.getName()).isEqualTo(tempDir.getFileName().toString());
+        assertThat(cfg.getBuildTool()).isEqualTo(BuildTool.MAVEN);  // auto-detected
+        assertThat(cfg.getLocalPath()).isEqualTo(tempDir.toAbsolutePath().toString());
+        assertThat(cfg.getUrl()).isEqualTo(tempDir.toAbsolutePath().toString());
     }
 
     // ── scanLocalDirectory: directory containing sub-repos ──────────────
@@ -85,19 +88,19 @@ class IngestionOrchestratorScanTest {
         Path repoB = tempDir.resolve("service-b");
         Files.createDirectories(repoA.resolve(".git"));
         Files.createDirectories(repoB.resolve(".git"));
-        Files.writeString(repoA.resolve("pom.xml"), "<project/>");
-        Files.writeString(repoB.resolve("build.gradle"), "plugins {}");
+        Files.write(repoA.resolve("pom.xml"), "<project/>".getBytes(StandardCharsets.UTF_8));
+        Files.write(repoB.resolve("build.gradle"), "plugins {}".getBytes(StandardCharsets.UTF_8));
 
         List<RepoConfig> result = orchestrator.scanLocalDirectory(
                 tempDir.toString(), BuildTool.MAVEN, "develop");
 
         assertThat(result).hasSize(2);
-        assertThat(result).extracting(RepoConfig::name)
+        assertThat(result).extracting(RepoConfig::getName)
                 .containsExactlyInAnyOrder("service-a", "service-b");
-        assertThat(result).filteredOn(r -> r.name().equals("service-a"))
-                .first().extracting(RepoConfig::buildTool).isEqualTo(BuildTool.MAVEN);
-        assertThat(result).filteredOn(r -> r.name().equals("service-b"))
-                .first().extracting(RepoConfig::buildTool).isEqualTo(BuildTool.GRADLE);
+        assertThat(result).filteredOn(r -> r.getName().equals("service-a"))
+                .first().extracting(RepoConfig::getBuildTool).isEqualTo(BuildTool.MAVEN);
+        assertThat(result).filteredOn(r -> r.getName().equals("service-b"))
+                .first().extracting(RepoConfig::getBuildTool).isEqualTo(BuildTool.GRADLE);
     }
 
     // ── scanLocalDirectory: empty directory returns empty list ──────────
@@ -122,7 +125,7 @@ class IngestionOrchestratorScanTest {
                 tempDir.toString(), BuildTool.MAVEN, "main");
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).name()).isEqualTo("real-repo");
+        assertThat(result.get(0).getName()).isEqualTo("real-repo");
     }
 
     // ── scanLocalDirectory: duplicate repos are skipped ─────────────────
@@ -158,7 +161,7 @@ class IngestionOrchestratorScanTest {
                 tempDir.toString(), BuildTool.GRADLE, "main");
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).buildTool()).isEqualTo(BuildTool.GRADLE);
+        assertThat(result.get(0).getBuildTool()).isEqualTo(BuildTool.GRADLE);
     }
 
     // ── scanLocalDirectory: branch is recorded on each repo ─────────────
@@ -172,6 +175,6 @@ class IngestionOrchestratorScanTest {
                 tempDir.toString(), BuildTool.MAVEN, "release/2.0");
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).branch()).isEqualTo("release/2.0");
+        assertThat(result.get(0).getBranch()).isEqualTo("release/2.0");
     }
 }

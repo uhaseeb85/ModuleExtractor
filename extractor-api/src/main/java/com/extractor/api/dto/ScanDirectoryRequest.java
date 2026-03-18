@@ -1,6 +1,6 @@
 package com.extractor.api.dto;
 
-import jakarta.validation.constraints.NotBlank;
+import javax.validation.constraints.NotBlank;
 
 /**
  * Request body for {@code POST /api/v1/ingestion/scan-directory}.

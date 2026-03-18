@@ -159,25 +159,27 @@ public class IngestionController {
             );
 
             if (found.isEmpty()) {
-                return ResponseEntity.ok(Map.of(
-                        "message", "No new Git repositories found under: " + req.getDirectoryPath(),
-                        "registered", List.of()
-                ));
+                Map<String, Object> emptyResult = new LinkedHashMap<String, Object>();
+                emptyResult.put("message", "No new Git repositories found under: " + req.getDirectoryPath());
+                emptyResult.put("registered", Collections.emptyList());
+                return ResponseEntity.ok(emptyResult);
             }
 
-            List<String> names = found.stream().map(com.extractor.core.model.RepoConfig::name).toList();
+            List<String> names = found.stream()
+                    .map(com.extractor.core.model.RepoConfig::getName)
+                    .collect(Collectors.toList());
 
             if (sync) {
                 SyncJobStatus job = orchestrator.triggerFullSync();
-                return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                        "registered", names,
-                        "syncJobId", job.getJobId()
-                ));
+                Map<String, Object> syncResult = new LinkedHashMap<String, Object>();
+                syncResult.put("registered", names);
+                syncResult.put("syncJobId", job.getJobId());
+                return ResponseEntity.status(HttpStatus.CREATED).body(syncResult);
             }
 
-            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("registered", names));
+            return ResponseEntity.status(HttpStatus.CREATED).body(Collections.singletonMap("registered", (Object) names));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", (Object) e.getMessage()));
         }
     }
 

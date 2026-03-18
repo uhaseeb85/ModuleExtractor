@@ -143,10 +143,10 @@ public class RepoScannerImpl implements RepoScanner {
             org.eclipse.jgit.api.PullCommand pullCommand = git.pull()
                     .setRemoteBranchName(config.getBranch());
             configureSsh(pullCommand);
-            var pullResult = pullCommand.call();
+            org.eclipse.jgit.api.PullResult pullResult = pullCommand.call();
             if (!pullResult.isSuccessful()) {
                 log.warn("Pull did not fully succeed for '{}' (possibly no remote) — using current HEAD",
-                        config.name());
+                        config.getName());
             }
 
             String sha = git.getRepository().resolve("HEAD").getName();
