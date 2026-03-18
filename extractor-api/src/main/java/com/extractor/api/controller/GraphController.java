@@ -4,7 +4,6 @@ import com.extractor.api.dto.GraphEdgeResponse;
 import com.extractor.api.dto.GraphNodeResponse;
 import com.extractor.graph.entity.ClassEntity;
 import com.extractor.graph.repository.ClassEntityRepository;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * REST controller exposing graph node and edge data for the frontend visualisation.
@@ -47,17 +47,17 @@ public class GraphController {
             @RequestParam(defaultValue = "500") int size) {
 
         List<ClassEntity> entities;
-        if (repo != null && !repo.isBlank()) {
+        if (repo != null && !repo.trim().isEmpty()) {
             entities = classRepository.findByRepoName(repo);
         } else {
             // Fetch all with pagination via findAll
-            entities = classRepository.findAll(PageRequest.of(page, size)).getContent();
+            entities = classRepository.findAll(page, size);
         }
 
         return entities.stream()
                 .filter(e -> type == null || type.equalsIgnoreCase(e.getClassType()))
                 .map(this::toNodeResponse)
-                .toList();
+                .collect(Collectors.toList());
     }
 
     /**
@@ -83,7 +83,7 @@ public class GraphController {
             @RequestParam(required = false) String repo,
             @RequestParam(defaultValue = "false") boolean crossRepoOnly) {
 
-        List<ClassEntity> classes = repo != null && !repo.isBlank()
+        List<ClassEntity> classes = repo != null && !repo.trim().isEmpty()
                 ? classRepository.findByRepoName(repo)
                 : classRepository.findAll();
 
@@ -112,7 +112,7 @@ public class GraphController {
             @RequestParam(defaultValue = "false") boolean crossRepoOnly) {
         return classRepository.findCallers(fqn, crossRepoOnly).stream()
                 .map(this::toNodeResponse)
-                .toList();
+                .collect(Collectors.toList());
     }
 
     /**
@@ -125,7 +125,7 @@ public class GraphController {
             @RequestParam(defaultValue = "3") int depth) {
         return classRepository.findTransitiveImpact(fqn, depth).stream()
                 .map(this::toNodeResponse)
-                .toList();
+                .collect(Collectors.toList());
     }
 
     /**
@@ -136,7 +136,7 @@ public class GraphController {
     public List<GraphNodeResponse> getSharedEntities() {
         return classRepository.findSharedEntityClasses().stream()
                 .map(this::toNodeResponse)
-                .toList();
+                .collect(Collectors.toList());
     }
 
     // ── Helpers ────────────────────────────────────────────────────────

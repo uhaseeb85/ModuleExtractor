@@ -1,6 +1,6 @@
 package com.extractor.api.dto;
 
-import jakarta.validation.constraints.NotBlank;
+import javax.validation.constraints.NotBlank;
 
 /**
  * Request body for {@code POST /api/v1/ingestion/repos}.
@@ -32,14 +32,14 @@ public class AddRepoRequest {
     public String getUrl() { return url; }
     public void setUrl(String url) { this.url = url; }
 
-    public String getBranch() { return branch == null || branch.isBlank() ? "main" : branch; }
+    public String getBranch() { return branch == null || branch.trim().isEmpty() ? "main" : branch; }
     public void setBranch(String branch) { this.branch = branch; }
 
-    public String getBuildTool() { return buildTool == null || buildTool.isBlank() ? "MAVEN" : buildTool.toUpperCase(); }
+    public String getBuildTool() { return buildTool == null || buildTool.trim().isEmpty() ? "MAVEN" : buildTool.toUpperCase(); }
     public void setBuildTool(String buildTool) { this.buildTool = buildTool; }
 
     public String getLocalPath() {
-        return (localPath == null || localPath.isBlank()) ? "/repos/" + name : localPath;
+        return (localPath == null || localPath.trim().isEmpty()) ? "/repos/" + name : localPath;
     }
     public void setLocalPath(String localPath) { this.localPath = localPath; }
 }

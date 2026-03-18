@@ -17,8 +17,10 @@ import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -60,7 +62,7 @@ public class MavenBuildParserImpl implements BuildFileParser {
 
     private Path runDependencyList(Path projectDir, RepoConfig repo) throws BuildParseException {
         try {
-            Path outputFile = Files.createTempFile("maven-deps-" + repo.name() + "-", ".txt");
+            Path outputFile = Files.createTempFile("maven-deps-" + repo.getName() + "-", ".txt");
 
             InvocationRequest request = new DefaultInvocationRequest();
             request.setPomFile(projectDir.resolve("pom.xml").toFile());
@@ -77,7 +79,7 @@ public class MavenBuildParserImpl implements BuildFileParser {
             Invoker invoker = new DefaultInvoker();
             // Allow Maven home to be configured via env or use default PATH resolution
             String mavenHome = System.getenv("MAVEN_HOME");
-            if (mavenHome != null && !mavenHome.isBlank()) {
+            if (mavenHome != null && !mavenHome.trim().isEmpty()) {
                 invoker.setMavenHome(new File(mavenHome));
             }
 
@@ -107,9 +109,9 @@ public class MavenBuildParserImpl implements BuildFileParser {
         try {
             List<String> lines = Files.readAllLines(outputFile);
             for (String line : lines) {
-                line = line.strip();
+                line = line.trim();
                 // Maven dependency:list format: groupId:artifactId:type:version:scope[:absPath]
-                if (line.isBlank() || line.startsWith("[INFO]") || line.startsWith("The following")) continue;
+                if (line.trim().isEmpty() || line.startsWith("[INFO]") || line.startsWith("The following")) continue;
 
                 String[] parts = line.split(":");
                 if (parts.length < 5) continue;
@@ -123,13 +125,13 @@ public class MavenBuildParserImpl implements BuildFileParser {
 
                 edges.add(new DependsOnEdge(
                         fromCoords[0], fromCoords[1], fromCoords[2],
-                        groupId, artifactId, version, scope, isTransitive, repo.name()));
+                        groupId, artifactId, version, scope, isTransitive, repo.getName()));
             }
         } catch (IOException e) {
             throw new BuildParseException("Could not read Maven output file: " + outputFile, BuildTool.MAVEN, projectDir, e);
         }
 
-        log.debug("Resolved {} Maven dependencies for repo '{}'", edges.size(), repo.name());
+        log.debug("Resolved {} Maven dependencies for repo '{}'", edges.size(), repo.getName());
         return edges;
     }
 
@@ -138,20 +140,20 @@ public class MavenBuildParserImpl implements BuildFileParser {
         try {
             List<String> lines = Files.readAllLines(outputFile);
             for (String line : lines) {
-                line = line.strip();
-                if (line.isBlank() || line.startsWith("[INFO]") || line.startsWith("The following")) continue;
+                line = line.trim();
+                if (line.trim().isEmpty() || line.startsWith("[INFO]") || line.startsWith("The following")) continue;
 
                 String[] parts = line.split(":");
                 // With -DoutputAbsoluteArtifactFilename=true the path is the last field
                 if (parts.length >= 6) {
-                    Path jarPath = Path.of(parts[parts.length - 1].strip());
+                    Path jarPath = Paths.get(parts[parts.length - 1].trim());
                     if (jarPath.toFile().exists() && jarPath.toString().endsWith(".jar")) {
                         jarPaths.add(jarPath);
                     }
                 }
             }
         } catch (IOException e) {
-            throw new BuildParseException("Could not read Maven dependency output", BuildTool.MAVEN, Path.of("."), e);
+            throw new BuildParseException("Could not read Maven dependency output", BuildTool.MAVEN, Paths.get("."), e);
         }
         return jarPaths;
     }
@@ -159,7 +161,7 @@ public class MavenBuildParserImpl implements BuildFileParser {
     private String[] readPomCoords(Path projectDir) {
         // Minimal POM coordinate extraction — production code should use Maven Model
         try {
-            String pom = Files.readString(projectDir.resolve("pom.xml"));
+            String pom = new String(Files.readAllBytes(projectDir.resolve("pom.xml")), StandardCharsets.UTF_8);
             String groupId = extractXmlValue(pom, "groupId", "com.unknown");
             String artifactId = extractXmlValue(pom, "artifactId", "unknown");
             String version = extractXmlValue(pom, "version", "0.0.0");
@@ -173,7 +175,7 @@ public class MavenBuildParserImpl implements BuildFileParser {
         int start = xml.indexOf("<" + tag + ">");
         int end = xml.indexOf("</" + tag + ">");
         if (start < 0 || end < 0) return defaultValue;
-        return xml.substring(start + tag.length() + 2, end).strip();
+        return xml.substring(start + tag.length() + 2, end).trim();
     }
 
     /**

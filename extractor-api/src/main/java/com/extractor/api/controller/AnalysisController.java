@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/analysis")
@@ -37,11 +38,11 @@ public class AnalysisController {
         return scoringService.rankCandidates(minClasses, limit)
                 .stream()
                 .map(s -> new CandidateSummaryDto(
-                        s.packageFqn(), s.repoName(),
-                        s.classCount(), s.inboundDeps(), s.outboundDeps(),
-                        s.isolationScore(), s.stabilityScore(), s.sizeScore(),
-                        s.compositeScore(), s.recommendation()))
-                .toList();
+                        s.getPackageFqn(), s.getRepoName(),
+                        s.getClassCount(), s.getInboundDeps(), s.getOutboundDeps(),
+                        s.getIsolationScore(), s.getStabilityScore(), s.getSizeScore(),
+                        s.getCompositeScore(), s.getRecommendation()))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -58,8 +59,8 @@ public class AnalysisController {
         List<CandidateScoringService.PackageScore> all = scoringService.rankCandidates(0, Integer.MAX_VALUE);
 
         CandidateScoringService.PackageScore match = all.stream()
-                .filter(s -> s.packageFqn().equals(packageFqn)
-                        && (repoName == null || repoName.isBlank() || s.repoName().equals(repoName)))
+                .filter(s -> s.getPackageFqn().equals(packageFqn)
+                        && (repoName == null || repoName.trim().isEmpty() || s.getRepoName().equals(repoName)))
                 .findFirst()
                 .orElse(null);
 
@@ -68,24 +69,24 @@ public class AnalysisController {
         }
 
         // Fetch actual class names from the graph
-        List<String> classNames = (repoName != null && !repoName.isBlank())
+        List<String> classNames = (repoName != null && !repoName.trim().isEmpty())
                 ? classRepo.findByRepoNameAndPackageName(repoName, packageFqn)
                            .stream()
                            .map(c -> c.getSimpleName() != null ? c.getSimpleName() : c.getFullyQualifiedName())
                            .sorted()
-                           .toList()
+                           .collect(Collectors.toList())
                 : classRepo.findByPackageName(packageFqn)
                            .stream()
                            .map(c -> c.getSimpleName() != null ? c.getSimpleName() : c.getFullyQualifiedName())
                            .sorted()
-                           .toList();
+                           .collect(Collectors.toList());
 
         CandidateDetailDto dto = new CandidateDetailDto(
-                match.packageFqn(), match.repoName(),
-                match.classCount(), match.inboundDeps(), match.outboundDeps(),
-                match.isolationScore(), match.stabilityScore(), match.sizeScore(),
-                match.compositeScore(), match.recommendation(),
-                match.blockers(), classNames);
+                match.getPackageFqn(), match.getRepoName(),
+                match.getClassCount(), match.getInboundDeps(), match.getOutboundDeps(),
+                match.getIsolationScore(), match.getStabilityScore(), match.getSizeScore(),
+                match.getCompositeScore(), match.getRecommendation(),
+                match.getBlockers(), classNames);
 
         return ResponseEntity.ok(dto);
     }
@@ -105,11 +106,11 @@ public class AnalysisController {
         return scoringService.recommendModules(groupDepth, minScore)
                 .stream()
                 .map(m -> new ModuleRecommendationDto(
-                        m.moduleName(), m.modulePackageRoot(), m.repoName(),
-                        m.packages(), m.classes(),
-                        m.totalClasses(), m.totalInboundDeps(), m.totalOutboundDeps(),
-                        m.avgCompositeScore(), m.minIsolationScore(),
-                        m.recommendation(), m.blockers()))
-                .toList();
+                        m.getModuleName(), m.getModulePackageRoot(), m.getRepoName(),
+                        m.getPackages(), m.getClasses(),
+                        m.getTotalClasses(), m.getTotalInboundDeps(), m.getTotalOutboundDeps(),
+                        m.getAvgCompositeScore(), m.getMinIsolationScore(),
+                        m.getRecommendation(), m.getBlockers()))
+                .collect(Collectors.toList());
     }
 }

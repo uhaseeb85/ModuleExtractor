@@ -2,24 +2,6 @@ spring:
   application:
     name: extractor-api
 
-  # Neo4j connection
-  neo4j:
-    uri: ${NEO4J_URI:bolt://localhost:7687}
-    authentication:
-      username: ${NEO4J_USERNAME:neo4j}
-      password: ${NEO4J_PASSWORD:extractor123}
-
-  # PostgreSQL (placeholder – not actively used in Phase 1)
-  datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/extractor}
-    username: ${SPRING_DATASOURCE_USERNAME:extractor}
-    password: ${SPRING_DATASOURCE_PASSWORD:extractor123}
-    driver-class-name: org.postgresql.Driver
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
-      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
-
   # Jackson
   jackson:
     default-property-inclusion: non_null
@@ -27,7 +9,7 @@ spring:
       write-dates-as-timestamps: false
 
 server:
-  port: 8080
+  port: 8081
   servlet:
     context-path: /
 
@@ -56,5 +38,3 @@ extractor:
 logging:
   level:
     com.extractor: DEBUG
-    org.springframework.data.neo4j: INFO
-    org.neo4j: WARN

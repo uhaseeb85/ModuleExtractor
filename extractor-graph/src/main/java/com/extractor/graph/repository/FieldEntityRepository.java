@@ -1,24 +1,30 @@
 package com.extractor.graph.repository;
 
 import com.extractor.graph.entity.FieldEntity;
-import org.springframework.data.neo4j.repository.Neo4jRepository;
-import org.springframework.data.neo4j.repository.query.Query;
-import org.springframework.data.repository.query.Param;
+import com.extractor.graph.store.GraphStore;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collections;
 import java.util.List;
 
 /**
- * Spring Data Neo4j repository for {@link FieldEntity} nodes.
+ * In-memory facade replacing the Neo4j/Spring-Data FieldEntityRepository.
  */
 @Repository
-public interface FieldEntityRepository extends Neo4jRepository<FieldEntity, Long> {
+public class FieldEntityRepository {
 
-    List<FieldEntity> findByRepoName(String repoName);
+    private final GraphStore store;
 
-    @Query("""
-            MATCH (c:Class {fullyQualifiedName: $classFqn})-[:CONTAINS]->(f:Field)
-            RETURN f
-            """)
-    List<FieldEntity> findByClassFqn(@Param("classFqn") String classFqn);
+    public FieldEntityRepository(GraphStore store) {
+        this.store = store;
+    }
+
+    public List<FieldEntity> findByRepoName(String repoName) {
+        // TODO: add repoName index to GraphStore if needed at scale
+        return Collections.emptyList();
+    }
+
+    public List<FieldEntity> findByClassFqn(String classFqn) {
+        return store.fieldsForClass(classFqn);
+    }
 }

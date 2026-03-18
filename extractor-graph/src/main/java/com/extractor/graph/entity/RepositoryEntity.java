@@ -1,48 +1,25 @@
 package com.extractor.graph.entity;
 
 import com.extractor.core.enums.BuildTool;
-import org.springframework.data.neo4j.core.schema.GeneratedValue;
-import org.springframework.data.neo4j.core.schema.Id;
-import org.springframework.data.neo4j.core.schema.Node;
-import org.springframework.data.neo4j.core.schema.Property;
-import org.springframework.data.neo4j.core.schema.Relationship;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 /**
- * Neo4j node representing a Git repository being analysed.
+ * Plain-POJO representing a Git repository being analysed.
+ * Stored in-memory via {@link com.extractor.graph.store.GraphStore}.
  */
-@Node("Repository")
 public class RepositoryEntity {
 
-    @Id
-    @GeneratedValue
-    private Long id;
-
-    @Property(name = "name")
     private String name;
-
-    @Property(name = "url")
     private String url;
-
-    @Property(name = "branch")
     private String branch;
-
-    @Property(name = "localPath")
     private String localPath;
-
-    @Property(name = "buildTool")
     private String buildTool;
-
-    @Property(name = "lastSyncSha")
     private String lastSyncSha;
-
-    @Property(name = "syncedAt")
     private String syncedAt;
 
-    @Relationship(type = "CONTAINS", direction = Relationship.Direction.OUTGOING)
     private List<ArtifactEntity> artifacts = new ArrayList<>();
 
     protected RepositoryEntity() {}
@@ -55,7 +32,7 @@ public class RepositoryEntity {
         this.buildTool = buildTool.name();
     }
 
-    public Long getId() { return id; }
+    public Long getId() { return name != null ? (long) name.hashCode() : null; }
     public String getName() { return name; }
     public String getUrl() { return url; }
     public String getBranch() { return branch; }
@@ -71,7 +48,8 @@ public class RepositoryEntity {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof RepositoryEntity that)) return false;
+        if (!(o instanceof RepositoryEntity)) return false;
+        RepositoryEntity that = (RepositoryEntity) o;
         return Objects.equals(name, that.name);
     }
 

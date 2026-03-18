@@ -5,11 +5,12 @@ import com.extractor.api.dto.RepoSummaryResponse;
 import com.extractor.api.dto.SyncJobResponse;
 import com.extractor.core.enums.BuildTool;
 import com.extractor.core.model.RepoConfig;
+import com.extractor.graph.entity.RepositoryEntity;
 import com.extractor.graph.repository.ClassEntityRepository;
 import com.extractor.graph.repository.RepositoryEntityRepository;
 import com.extractor.ingestion.model.SyncJobStatus;
 import com.extractor.ingestion.service.IngestionOrchestrator;
-import jakarta.validation.Valid;
+import javax.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -21,8 +22,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * REST controller for repository ingestion / sync operations.
@@ -85,19 +91,19 @@ public class IngestionController {
     public List<RepoSummaryResponse> listRepos() {
         return orchestrator.getConfiguredRepos().stream()
                 .map(repo -> {
-                    var entity = repoEntityRepository.findByName(repo.name());
-                    long nodeCount = classEntityRepository.findByRepoName(repo.name()).size();
+                    Optional<RepositoryEntity> entity = repoEntityRepository.findByName(repo.getName());
+                    long nodeCount = classEntityRepository.findByRepoName(repo.getName()).size();
                     return new RepoSummaryResponse(
-                            repo.name(),
-                            repo.url(),
-                            repo.branch(),
-                            repo.buildTool().name(),
+                            repo.getName(),
+                            repo.getUrl(),
+                            repo.getBranch(),
+                            repo.getBuildTool().name(),
                             entity.map(e -> e.getLastSyncSha()).orElse(null),
                             entity.map(e -> e.getSyncedAt()).orElse(null),
                             nodeCount
                     );
                 })
-                .toList();
+                .collect(Collectors.toList());
     }
 
     /**
@@ -121,15 +127,15 @@ public class IngestionController {
             // Optionally kick off immediate ingestion
             if (sync) {
                 SyncJobStatus job = orchestrator.triggerFullSync();
-                return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
-                        "repo", req.getName(),
-                        "syncJobId", job.getJobId()
-                ));
+                Map<String, Object> body = new LinkedHashMap<String, Object>();
+                body.put("repo", req.getName());
+                body.put("syncJobId", job.getJobId());
+                return ResponseEntity.status(HttpStatus.CREATED).body(body);
             }
 
-            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("repo", req.getName()));
+            return ResponseEntity.status(HttpStatus.CREATED).body(Collections.singletonMap("repo", req.getName()));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
         }
     }
 
@@ -151,7 +157,7 @@ public class IngestionController {
                 job.getStatus(),
                 job.getProgressPercent(),
                 job.getCurrentRepo(),
-                List.copyOf(job.getErrors()),
+                new ArrayList<>(job.getErrors()),
                 job.getStartedAt(),
                 job.getCompletedAt()
         );

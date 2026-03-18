@@ -10,9 +10,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -32,13 +34,13 @@ class JavaSourceParserImplTest {
     void setUp() {
         parser = new JavaSourceParserImpl();
         parser.registerSourceRoot(tempDir);
-        repoConfig = new RepoConfig("test-repo", "file://local", "main", BuildTool.MAVEN, tempDir);
+        repoConfig = new RepoConfig("test-repo", "file://local", "main", BuildTool.MAVEN, tempDir.toString());
     }
 
     private Path writeSource(String relativePath, String content) throws IOException {
         Path file = tempDir.resolve(relativePath);
         Files.createDirectories(file.getParent());
-        Files.writeString(file, content);
+        Files.write(file, content.getBytes(StandardCharsets.UTF_8));
         return file;
     }
 
@@ -51,13 +53,13 @@ class JavaSourceParserImplTest {
 
         ParseResult result = parser.parse(source, repoConfig);
 
-        ClassNode clazz = result.classNode();
-        assertThat(clazz.fqn()).isEqualTo("com.example.Foo");
-        assertThat(clazz.simpleName()).isEqualTo("Foo");
-        assertThat(clazz.classType()).isEqualTo(ClassType.CLASS);
+        ClassNode clazz = result.getClassNode();
+        assertThat(clazz.getFqn()).isEqualTo("com.example.Foo");
+        assertThat(clazz.getSimpleName()).isEqualTo("Foo");
+        assertThat(clazz.getClassType()).isEqualTo(ClassType.CLASS);
         assertThat(clazz.isAbstract()).isFalse();
-        assertThat(result.methods()).hasSize(1);
-        assertThat(result.methods().get(0).name()).isEqualTo("bar");
+        assertThat(result.getMethods()).hasSize(1);
+        assertThat(result.getMethods().get(0).getName()).isEqualTo("bar");
     }
 
     @Test
@@ -67,8 +69,8 @@ class JavaSourceParserImplTest {
 
         ParseResult result = parser.parse(source, repoConfig);
 
-        assertThat(result.classNode().classType()).isEqualTo(ClassType.INTERFACE);
-        assertThat(result.methods()).hasSize(1);
+        assertThat(result.getClassNode().getClassType()).isEqualTo(ClassType.INTERFACE);
+        assertThat(result.getMethods()).hasSize(1);
     }
 
     @Test
@@ -78,7 +80,7 @@ class JavaSourceParserImplTest {
 
         ParseResult result = parser.parse(source, repoConfig);
 
-        assertThat(result.classNode().classType()).isEqualTo(ClassType.ENUM);
+        assertThat(result.getClassNode().getClassType()).isEqualTo(ClassType.ENUM);
     }
 
     @Test
@@ -88,7 +90,7 @@ class JavaSourceParserImplTest {
 
         ParseResult result = parser.parse(source, repoConfig);
 
-        assertThat(result.classNode().classType()).isEqualTo(ClassType.RECORD);
+        assertThat(result.getClassNode().getClassType()).isEqualTo(ClassType.RECORD);
     }
 
     @Test
@@ -98,7 +100,7 @@ class JavaSourceParserImplTest {
 
         ParseResult result = parser.parse(source, repoConfig);
 
-        assertThat(result.classNode().classType()).isEqualTo(ClassType.ANNOTATION);
+        assertThat(result.getClassNode().getClassType()).isEqualTo(ClassType.ANNOTATION);
     }
 
     @Test
@@ -108,9 +110,9 @@ class JavaSourceParserImplTest {
 
         ParseResult result = parser.parse(source, repoConfig);
 
-        List<String> imports = result.imports().stream()
-                .map(e -> e.importedFqn())
-                .toList();
+        List<String> imports = result.getImports().stream()
+                .map(e -> e.getImportedFqn())
+                .collect(Collectors.toList());
         assertThat(imports).contains("com.example.Foo");
     }
 
@@ -121,8 +123,8 @@ class JavaSourceParserImplTest {
 
         ParseResult result = parser.parse(source, repoConfig);
 
-        assertThat(result.fields()).hasSize(2);
-        assertThat(result.fields().stream().map(f -> f.name()).toList())
+        assertThat(result.getFields()).hasSize(2);
+        assertThat(result.getFields().stream().map(f -> f.getName()).collect(Collectors.toList()))
                 .containsExactlyInAnyOrder("name", "count");
     }
 
@@ -133,9 +135,9 @@ class JavaSourceParserImplTest {
 
         ParseResult result = parser.parse(source, repoConfig);
 
-        assertThat(result.annotations()).isNotEmpty();
-        boolean hasRestController = result.annotations().stream()
-                .anyMatch(a -> a.annotationFqn().contains("RestController"));
+        assertThat(result.getAnnotations()).isNotEmpty();
+        boolean hasRestController = result.getAnnotations().stream()
+                .anyMatch(a -> a.getAnnotationFqn().contains("RestController"));
         assertThat(hasRestController).isTrue();
     }
 
@@ -146,7 +148,7 @@ class JavaSourceParserImplTest {
 
         // Should not throw
         ParseResult result = parser.parse(source, repoConfig);
-        assertThat(result.classNode().simpleName()).isEqualTo("Outer");
+        assertThat(result.getClassNode().getSimpleName()).isEqualTo("Outer");
     }
 
     @Test
@@ -155,7 +157,7 @@ class JavaSourceParserImplTest {
                 "package com.example;\npublic class Box<T> {\n  private T value;\n  public T get() { return value; }\n}\n");
 
         ParseResult result = parser.parse(source, repoConfig);
-        assertThat(result.classNode().fqn()).isEqualTo("com.example.Box");
-        assertThat(result.methods()).hasSize(1);
+        assertThat(result.getClassNode().getFqn()).isEqualTo("com.example.Box");
+        assertThat(result.getMethods()).hasSize(1);
     }
 }

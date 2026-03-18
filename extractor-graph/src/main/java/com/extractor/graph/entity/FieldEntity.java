@@ -1,36 +1,20 @@
 package com.extractor.graph.entity;
 
-import org.springframework.data.neo4j.core.schema.GeneratedValue;
-import org.springframework.data.neo4j.core.schema.Id;
-import org.springframework.data.neo4j.core.schema.Node;
-import org.springframework.data.neo4j.core.schema.Property;
-
 import java.util.Objects;
 
 /**
- * Neo4j node representing a field declared on a Java class.
+ * Plain-POJO representing a field declared on a Java class.
+ * Stored in-memory via {@link com.extractor.graph.store.GraphStore}.
  */
-@Node("Field")
 public class FieldEntity {
 
-    @Id
-    @GeneratedValue
-    private Long id;
-
-    @Property(name = "name")
     private String name;
-
-    @Property(name = "fieldType")
     private String fieldType;
-
-    @Property(name = "visibility")
     private String visibility;
 
     /** JSON array string of annotation simple names, e.g. {@code ["Autowired","Qualifier"]}. */
-    @Property(name = "annotations")
     private String annotations;
 
-    @Property(name = "repoName")
     private String repoName;
 
     protected FieldEntity() {}
@@ -43,7 +27,8 @@ public class FieldEntity {
         this.repoName = repoName;
     }
 
-    public Long getId() { return id; }
+    /** Synthetic ID derived from name+repo hashCode. */
+    public Long getId() { return (long) Objects.hash(name, repoName); }
     public String getName() { return name; }
     public String getFieldType() { return fieldType; }
     public String getVisibility() { return visibility; }
@@ -54,7 +39,8 @@ public class FieldEntity {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof FieldEntity that)) return false;
+        if (!(o instanceof FieldEntity)) return false;
+        FieldEntity that = (FieldEntity) o;
         return Objects.equals(name, that.name) && Objects.equals(repoName, that.repoName);
     }
 

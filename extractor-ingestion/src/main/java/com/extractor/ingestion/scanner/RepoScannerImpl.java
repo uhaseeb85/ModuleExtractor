@@ -28,8 +28,11 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * JGit-backed implementation of {@link RepoScanner}.
@@ -48,7 +51,7 @@ public class RepoScannerImpl implements RepoScanner {
 
     @Override
     public String syncRepo(RepoConfig config) throws IngestionException {
-        Path localPath = Path.of(config.localPath());
+        Path localPath = Paths.get(config.getLocalPath());
 
         try {
             if (Files.exists(localPath.resolve(".git"))) {
@@ -58,19 +61,19 @@ public class RepoScannerImpl implements RepoScanner {
             }
         } catch (Exception e) {
             throw new IngestionException(
-                    "Failed to sync repo '" + config.name() + "' from " + config.url(), e);
+                    "Failed to sync repo '" + config.getName() + "' from " + config.getUrl(), e);
         }
     }
 
     @Override
     public List<Path> getChangedFiles(RepoConfig config, String lastSha) throws IngestionException {
-        Path localPath = Path.of(config.localPath());
+        Path localPath = Paths.get(config.getLocalPath());
         List<Path> changedFiles = new ArrayList<>();
 
         try (Git git = Git.open(localPath.toFile())) {
             Repository repo = git.getRepository();
 
-            if (lastSha == null || lastSha.isBlank()) {
+            if (lastSha == null || lastSha.trim().isEmpty()) {
                 // Return all .java files
                 return findAllJavaFiles(localPath);
             }
@@ -80,7 +83,7 @@ public class RepoScannerImpl implements RepoScanner {
 
             if (oldHead == null || newHead == null) {
                 log.warn("Could not resolve SHA '{}' or HEAD for repo '{}' — returning all files",
-                        lastSha, config.name());
+                        lastSha, config.getName());
                 return findAllJavaFiles(localPath);
             }
 
@@ -107,7 +110,7 @@ public class RepoScannerImpl implements RepoScanner {
 
         } catch (IOException e) {
             throw new IngestionException(
-                    "Failed to compute changed files for repo '" + config.name() + "'", e);
+                    "Failed to compute changed files for repo '" + config.getName() + "'", e);
         }
 
         return changedFiles;
@@ -116,40 +119,40 @@ public class RepoScannerImpl implements RepoScanner {
     // ── Private helpers ────────────────────────────────────────────────
 
     private String clone(RepoConfig config, Path localPath) throws GitAPIException, IOException {
-        log.info("Cloning '{}' from {} into {}", config.name(), config.url(), localPath);
+        log.info("Cloning '{}' from {} into {}", config.getName(), config.getUrl(), localPath);
         Files.createDirectories(localPath);
 
-        var cloneCommand = Git.cloneRepository()
-                .setURI(config.url())
+        org.eclipse.jgit.api.CloneCommand cloneCommand = Git.cloneRepository()
+                .setURI(config.getUrl())
                 .setDirectory(localPath.toFile())
-                .setBranch(config.branch());
+                .setBranch(config.getBranch());
 
         configureSsh(cloneCommand);
 
         try (Git git = cloneCommand.call()) {
             String sha = git.getRepository().resolve("HEAD").getName();
-            log.info("Cloned '{}' @ {}", config.name(), sha);
+            log.info("Cloned '{}' @ {}", config.getName(), sha);
             return sha;
         }
     }
 
     private String pull(RepoConfig config, Path localPath) throws IOException, GitAPIException {
-        log.info("Pulling latest for '{}' (branch: {})", config.name(), config.branch());
+        log.info("Pulling latest for '{}' (branch: {})", config.getName(), config.getBranch());
 
         try (Git git = Git.open(localPath.toFile())) {
-            var pullCommand = git.pull()
-                    .setRemoteBranchName(config.branch());
+            org.eclipse.jgit.api.PullCommand pullCommand = git.pull()
+                    .setRemoteBranchName(config.getBranch());
             configureSsh(pullCommand);
             pullCommand.call();
 
             String sha = git.getRepository().resolve("HEAD").getName();
-            log.info("Pulled '{}' @ {}", config.name(), sha);
+            log.info("Pulled '{}' @ {}", config.getName(), sha);
             return sha;
         }
     }
 
     private void configureSsh(Object command) {
-        if (sshKeyPath == null || sshKeyPath.isBlank()) return;
+        if (sshKeyPath == null || sshKeyPath.trim().isEmpty()) return;
 
         File keyFile = new File(sshKeyPath);
         if (!keyFile.exists()) {
@@ -163,15 +166,19 @@ public class RepoScannerImpl implements RepoScanner {
                 .setSshDirectory(keyFile.getParentFile())
                 .build(null);
 
-        if (command instanceof org.eclipse.jgit.api.CloneCommand c) {
+        if (command instanceof org.eclipse.jgit.api.CloneCommand) {
+            org.eclipse.jgit.api.CloneCommand c = (org.eclipse.jgit.api.CloneCommand) command;
             c.setTransportConfigCallback(transport -> {
-                if (transport instanceof SshTransport sshTransport) {
+                if (transport instanceof SshTransport) {
+                    SshTransport sshTransport = (SshTransport) transport;
                     sshTransport.setSshSessionFactory(sshSessionFactory);
                 }
             });
-        } else if (command instanceof org.eclipse.jgit.api.PullCommand p) {
+        } else if (command instanceof org.eclipse.jgit.api.PullCommand) {
+            org.eclipse.jgit.api.PullCommand p = (org.eclipse.jgit.api.PullCommand) command;
             p.setTransportConfigCallback(transport -> {
-                if (transport instanceof SshTransport sshTransport) {
+                if (transport instanceof SshTransport) {
+                    SshTransport sshTransport = (SshTransport) transport;
                     sshTransport.setSshSessionFactory(sshSessionFactory);
                 }
             });
@@ -190,11 +197,11 @@ public class RepoScannerImpl implements RepoScanner {
     }
 
     private List<Path> findAllJavaFiles(Path root) throws IngestionException {
-        try (var stream = Files.walk(root)) {
+        try (Stream<Path> stream = Files.walk(root)) {
             return stream
                     .filter(p -> p.toString().endsWith(".java"))
                     .filter(Files::isRegularFile)
-                    .toList();
+                    .collect(Collectors.toList());
         } catch (IOException e) {
             throw new IngestionException("Failed to walk directory: " + root, e);
         }

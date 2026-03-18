@@ -1,69 +1,88 @@
 # Java Monolith Module Extractor
 
-A tool for analysing Java monoliths and mapping cross-module dependencies into a Neo4j graph — Phase 1 (Foundation & Visibility).
+A tool for analysing Java monoliths and mapping cross-module dependencies into an in-memory graph — Phase 1 (Foundation & Visibility).
+
+> **No external infrastructure required.** The dependency graph is stored in-memory using [JGraphT](https://jgrapht.org/). Just start the app and point it at a repo.
 
 ## Modules
 
 | Module | Purpose |
 |---|---|
 | `extractor-core` | Enums, model records, interfaces, exceptions — no Spring |
-| `extractor-graph` | Spring Data Neo4j entities, repositories, `GraphBuilderImpl` |
+| `extractor-graph` | JGraphT-backed `GraphStore`, entities, repositories, `GraphBuilderImpl` |
 | `extractor-ingestion` | JGit scanner, JavaParser, Maven/Gradle build parsers, orchestrator |
 | `extractor-api` | Spring Boot REST API (`/api/v1/graph`, `/api/v1/ingestion`) |
-| `extractor-analysis` | Phase 2 stub — coupling metrics, blocker detection |
+| `extractor-analysis` | Coupling metrics, candidate scoring |
 | `extractor-search` | Phase 3 stub — semantic/vector search |
 | `extractor-frontend` | React 18 + Vite + Cytoscape.js visualisation |
 
-## Quick Start (Docker Compose)
+---
+
+## Running Locally (Recommended)
+
+### Prerequisites
+- Java 17+
+- Maven 3.9+
+- Node.js 20+
+
+### 1 — Build
 
 ```bash
-# 1. Build the API image
-mvn -B clean package -pl extractor-api -am -DskipTests
+cd C:\Users\uhase\ModuleExtractor   # or wherever you cloned it
+mvn clean package -DskipTests
+```
 
+### 2 — Start the backend
+
+```bash
+mvn spring-boot:run -pl extractor-api
+```
+
+API is available at **http://localhost:8081**
+
+Verify it started:
+
+```bash
+curl http://localhost:8081/actuator/health
+# {"status":"UP"}
+```
+
+### 3 — Start the frontend
+
+```bash
+cd extractor-frontend
+npm install        # first time only
+npm run dev
+```
+
+Frontend is available at **http://localhost:5173** (API calls are proxied to `:8081`)
+
+---
+
+## Running via Docker Compose
+
+```bash
+# 1. Build the API jar and image
+mvn clean package -DskipTests
 docker build -t extractor-api:latest -f extractor-api/Dockerfile .
 
 # 2. Build the frontend image
-cd extractor-frontend && npm ci && npm run build
+cd extractor-frontend
 docker build -t extractor-frontend:latest .
 cd ..
 
 # 3. Start everything
 docker compose up -d
 
-# Neo4j browser:  http://localhost:7474  (neo4j / extractor123)
-# API:            http://localhost:8080
-# Frontend:       http://localhost:5173
+# API:       http://localhost:8081
+# Frontend:  http://localhost:5173
 ```
 
-## Local Development
+---
 
-### Prerequisites
-- Java 21
-- Maven 3.9+
-- Node.js 20+
-- Running Neo4j 5 instance (or use `docker compose up neo4j`)
+## Configuring Repositories to Scan
 
-### Backend
-
-```bash
-# Start Neo4j only
-docker compose up -d neo4j
-
-# Build and run API
-mvn -pl extractor-api -am spring-boot:run
-```
-
-### Frontend
-
-```bash
-cd extractor-frontend
-npm install
-npm run dev    # http://localhost:5173  (proxied → :8080)
-```
-
-## Configuration
-
-Edit `extractor-api/src/main/resources/application.yml`:
+Edit `extractor-api/src/main/resources/application.yml` and add repos under `extractor.repos`:
 
 ```yaml
 extractor:
@@ -74,9 +93,23 @@ extractor:
       buildTool: MAVEN
       localPath: /repos/my-monolith
   git:
-    cloneOnStartup: true
-    # sshKeyPath: /home/user/.ssh/id_rsa  # for SSH repos
+    cloneOnStartup: true   # set false if already cloned locally
+    # sshKeyPath: ~/.ssh/id_rsa  # for SSH repos
 ```
+
+Or trigger an ad-hoc scan via the API after startup:
+
+```bash
+# Trigger full sync of all configured repos
+curl -X POST http://localhost:8081/api/v1/ingestion/sync
+
+# Poll job status
+curl http://localhost:8081/api/v1/ingestion/jobs/{jobId}
+```
+
+> The graph is **in-memory only** — it is rebuilt each time the app starts or a sync is triggered. There is no database to set up or maintain.
+
+---
 
 ## API Reference
 
@@ -100,12 +133,15 @@ extractor:
 | `GET` | `/api/v1/graph/impact` | Transitive impact (`?class=&depth=`) |
 | `GET` | `/api/v1/graph/shared-entities` | `@Entity` classes imported cross-repo |
 
+---
+
 ## Running Tests
 
 ```bash
-# Unit tests (no Docker needed)
-mvn test -pl extractor-ingestion -Dtest="JavaSourceParserImplTest,MavenBuildParserImplTest"
+# All unit tests (no Docker or database needed)
+mvn test -DskipTests=false
 
-# Integration tests (requires Docker for Testcontainers)
-mvn verify -pl extractor-graph,extractor-api
+# Specific module
+mvn test -pl extractor-graph
+mvn test -pl extractor-ingestion
 ```

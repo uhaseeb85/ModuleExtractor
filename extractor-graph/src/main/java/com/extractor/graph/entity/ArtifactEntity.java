@@ -1,45 +1,25 @@
 package com.extractor.graph.entity;
 
-import org.springframework.data.neo4j.core.schema.GeneratedValue;
-import org.springframework.data.neo4j.core.schema.Id;
-import org.springframework.data.neo4j.core.schema.Node;
-import org.springframework.data.neo4j.core.schema.Property;
-import org.springframework.data.neo4j.core.schema.Relationship;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 /**
- * Neo4j node representing a Maven/Gradle artifact (groupId:artifactId:version).
+ * Plain-POJO representing a Maven/Gradle artifact (groupId:artifactId:version).
+ * Stored in-memory via {@link com.extractor.graph.store.GraphStore}.
  */
-@Node("Artifact")
 public class ArtifactEntity {
 
-    @Id
-    @GeneratedValue
-    private Long id;
-
-    @Property(name = "groupId")
     private String groupId;
-
-    @Property(name = "artifactId")
     private String artifactId;
-
-    @Property(name = "version")
     private String version;
 
     /** JAR, POM, or WAR */
-    @Property(name = "type")
     private String type;
 
-    @Property(name = "repoName")
     private String repoName;
 
-    @Relationship(type = "CONTAINS", direction = Relationship.Direction.OUTGOING)
     private List<PackageEntity> packages = new ArrayList<>();
-
-    @Relationship(type = "DEPENDS_ON", direction = Relationship.Direction.OUTGOING)
     private List<ArtifactDependency> dependencies = new ArrayList<>();
 
     protected ArtifactEntity() {}
@@ -52,7 +32,7 @@ public class ArtifactEntity {
         this.repoName = repoName;
     }
 
-    public Long getId() { return id; }
+    public Long getId() { return (long) Objects.hash(groupId, artifactId, version); }
     public String getGroupId() { return groupId; }
     public String getArtifactId() { return artifactId; }
     public String getVersion() { return version; }
@@ -66,7 +46,8 @@ public class ArtifactEntity {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof ArtifactEntity that)) return false;
+        if (!(o instanceof ArtifactEntity)) return false;
+        ArtifactEntity that = (ArtifactEntity) o;
         return Objects.equals(groupId, that.groupId)
                 && Objects.equals(artifactId, that.artifactId)
                 && Objects.equals(version, that.version);

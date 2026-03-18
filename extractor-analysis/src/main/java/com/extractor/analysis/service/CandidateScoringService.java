@@ -1,7 +1,9 @@
 package com.extractor.analysis.service;
 
-import org.neo4j.driver.Driver;
-import org.neo4j.driver.Session;
+import com.extractor.graph.entity.ClassEntity;
+import com.extractor.graph.store.GraphStore;
+import org.jgrapht.graph.DefaultDirectedGraph;
+import org.jgrapht.graph.DefaultEdge;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -21,46 +23,108 @@ import java.util.stream.Collectors;
 @Service
 public class CandidateScoringService {
 
-    private final Driver driver;
+    private final GraphStore store;
 
-    public CandidateScoringService(Driver driver) {
-        this.driver = driver;
+    public CandidateScoringService(GraphStore store) {
+        this.store = store;
     }
 
     // ── Public API ────────────────────────────────────────────────────
 
-    public record PackageScore(
-            String packageFqn,
-            String repoName,
-            int classCount,
-            int outboundDeps,
-            int inboundDeps,
-            double isolationScore,
-            double stabilityScore,
-            double sizeScore,
-            double compositeScore,
-            String recommendation,
-            List<String> blockers
-    ) {}
+    public static final class PackageScore {
+        private final String packageFqn;
+        private final String repoName;
+        private final int classCount;
+        private final int outboundDeps;
+        private final int inboundDeps;
+        private final double isolationScore;
+        private final double stabilityScore;
+        private final double sizeScore;
+        private final double compositeScore;
+        private final String recommendation;
+        private final List<String> blockers;
+
+        public PackageScore(String packageFqn, String repoName, int classCount,
+                            int outboundDeps, int inboundDeps,
+                            double isolationScore, double stabilityScore,
+                            double sizeScore, double compositeScore,
+                            String recommendation, List<String> blockers) {
+            this.packageFqn = packageFqn;
+            this.repoName = repoName;
+            this.classCount = classCount;
+            this.outboundDeps = outboundDeps;
+            this.inboundDeps = inboundDeps;
+            this.isolationScore = isolationScore;
+            this.stabilityScore = stabilityScore;
+            this.sizeScore = sizeScore;
+            this.compositeScore = compositeScore;
+            this.recommendation = recommendation;
+            this.blockers = blockers;
+        }
+
+        public String getPackageFqn() { return packageFqn; }
+        public String getRepoName() { return repoName; }
+        public int getClassCount() { return classCount; }
+        public int getOutboundDeps() { return outboundDeps; }
+        public int getInboundDeps() { return inboundDeps; }
+        public double getIsolationScore() { return isolationScore; }
+        public double getStabilityScore() { return stabilityScore; }
+        public double getSizeScore() { return sizeScore; }
+        public double getCompositeScore() { return compositeScore; }
+        public String getRecommendation() { return recommendation; }
+        public List<String> getBlockers() { return blockers; }
+    }
 
     /**
      * A proposed extracted module: one or more related packages grouped under a common root,
      * with their full class list and an overall extraction recommendation.
      */
-    public record ModuleRecommendation(
-            String moduleName,         // e.g. "auth"
-            String modulePackageRoot,  // e.g. "com.bank.ivr.auth"
-            String repoName,
-            List<String> packages,
-            List<String> classes,
-            int totalClasses,
-            int totalInboundDeps,
-            int totalOutboundDeps,
-            double avgCompositeScore,
-            double minIsolationScore,
-            String recommendation,     // "Extract now" / "Extract with refactoring" / "Low priority"
-            List<String> blockers
-    ) {}
+    public static final class ModuleRecommendation {
+        private final String moduleName;
+        private final String modulePackageRoot;
+        private final String repoName;
+        private final List<String> packages;
+        private final List<String> classes;
+        private final int totalClasses;
+        private final int totalInboundDeps;
+        private final int totalOutboundDeps;
+        private final double avgCompositeScore;
+        private final double minIsolationScore;
+        private final String recommendation;
+        private final List<String> blockers;
+
+        public ModuleRecommendation(String moduleName, String modulePackageRoot, String repoName,
+                                    List<String> packages, List<String> classes,
+                                    int totalClasses, int totalInboundDeps, int totalOutboundDeps,
+                                    double avgCompositeScore, double minIsolationScore,
+                                    String recommendation, List<String> blockers) {
+            this.moduleName = moduleName;
+            this.modulePackageRoot = modulePackageRoot;
+            this.repoName = repoName;
+            this.packages = packages;
+            this.classes = classes;
+            this.totalClasses = totalClasses;
+            this.totalInboundDeps = totalInboundDeps;
+            this.totalOutboundDeps = totalOutboundDeps;
+            this.avgCompositeScore = avgCompositeScore;
+            this.minIsolationScore = minIsolationScore;
+            this.recommendation = recommendation;
+            this.blockers = blockers;
+        }
+
+        public String getModuleName() { return moduleName; }
+        public String getModulePackageRoot() { return modulePackageRoot; }
+        public String getRepoName() { return repoName; }
+        public List<String> getPackages() { return packages; }
+        public List<String> getClasses() { return classes; }
+        public int getTotalClasses() { return totalClasses; }
+        public int getTotalInboundDeps() { return totalInboundDeps; }
+        public int getTotalOutboundDeps() { return totalOutboundDeps; }
+        public double getAvgCompositeScore() { return avgCompositeScore; }
+        public double getMinIsolationScore() { return minIsolationScore; }
+        public String getRecommendation() { return recommendation; }
+        public List<String> getBlockers() { return blockers; }
+    }
 
     /**
      * Scores all packages in the graph and returns them ranked by composite score (descending).
@@ -109,8 +173,8 @@ public class CandidateScoringService {
                     recommendation, blockers));
         }
 
-        results.sort((a, b) -> Double.compare(b.compositeScore(), a.compositeScore()));
-        return results.stream().limit(limit).toList();
+        results.sort((a, b) -> Double.compare(b.getCompositeScore(), a.getCompositeScore()));
+        return results.stream().limit(limit).collect(Collectors.toList());
     }
 
     /**
@@ -128,32 +192,32 @@ public class CandidateScoringService {
         // Group by (moduleRoot, repoName)
         Map<String, List<PackageScore>> groups = new LinkedHashMap<>();
         for (PackageScore p : all) {
-            if (p.compositeScore() < minScore) continue;
-            String root = moduleRoot(p.packageFqn(), groupDepth);
-            String key  = root + "::" + p.repoName();
+            if (p.getCompositeScore() < minScore) continue;
+            String root = moduleRoot(p.getPackageFqn(), groupDepth);
+            String key  = root + "::" + p.getRepoName();
             groups.computeIfAbsent(key, k -> new ArrayList<>()).add(p);
         }
 
         List<ModuleRecommendation> result = new ArrayList<>();
         for (Map.Entry<String, List<PackageScore>> e : groups.entrySet()) {
             List<PackageScore> pkgs = e.getValue();
-            String root = moduleRoot(pkgs.get(0).packageFqn(), groupDepth);
-            String repo = pkgs.get(0).repoName();
+            String root = moduleRoot(pkgs.get(0).getPackageFqn(), groupDepth);
+            String repo = pkgs.get(0).getRepoName();
 
             List<String> packageNames = pkgs.stream()
-                    .map(PackageScore::packageFqn).sorted().toList();
+                    .map(PackageScore::getPackageFqn).sorted().collect(Collectors.toList());
             List<String> classes = fetchClassesForPackages(packageNames, repo);
 
-            double avgScore  = pkgs.stream().mapToDouble(PackageScore::compositeScore).average().orElse(0);
-            double minIso    = pkgs.stream().mapToDouble(PackageScore::isolationScore).min().orElse(0);
-            int    totalIn   = pkgs.stream().mapToInt(PackageScore::inboundDeps).sum();
-            int    totalOut  = pkgs.stream().mapToInt(PackageScore::outboundDeps).sum();
-            int    totalCls  = pkgs.stream().mapToInt(PackageScore::classCount).sum();
+            double avgScore  = pkgs.stream().mapToDouble(PackageScore::getCompositeScore).average().orElse(0);
+            double minIso    = pkgs.stream().mapToDouble(PackageScore::getIsolationScore).min().orElse(0);
+            int    totalIn   = pkgs.stream().mapToInt(PackageScore::getInboundDeps).sum();
+            int    totalOut  = pkgs.stream().mapToInt(PackageScore::getOutboundDeps).sum();
+            int    totalCls  = pkgs.stream().mapToInt(PackageScore::getClassCount).sum();
 
             // Aggregate blockers (de-duplicate)
             List<String> blockers = pkgs.stream()
-                    .flatMap(ps -> ps.blockers().stream())
-                    .distinct().toList();
+                    .flatMap(ps -> ps.getBlockers().stream())
+                    .distinct().collect(Collectors.toList());
 
             String rec = avgScore >= 0.65 ? "Extract now"
                     : avgScore >= 0.45    ? "Extract with refactoring"
@@ -167,27 +231,20 @@ public class CandidateScoringService {
                     rec, blockers));
         }
 
-        result.sort((a, b) -> Double.compare(b.avgCompositeScore(), a.avgCompositeScore()));
+        result.sort((a, b) -> Double.compare(b.getAvgCompositeScore(), a.getAvgCompositeScore()));
         return result;
     }
 
-    // ── Cypher helpers ────────────────────────────────────────────────
+    // ── JGraphT / in-memory data helpers ──────────────────────────────
 
     /** Returns map of "pkg::repo" → [classCount] */
     private Map<String, int[]> fetchPackageClassCounts() {
         Map<String, int[]> map = new HashMap<>();
-        try (Session s = driver.session()) {
-            s.run("""
-                    MATCH (c:Class)
-                    WHERE c.packageName IS NOT NULL AND trim(c.packageName) <> ''
-                    RETURN c.packageName AS pkg, c.repoName AS repo, count(c) AS n
-                    """)
-             .list()
-             .forEach(r -> {
-                 String key = key(r.get("pkg").asString(""), r.get("repo").asString(""));
-                 int n = r.get("n").asInt(0);
-                 map.put(key, new int[]{n});
-             });
+        for (ClassEntity c : store.allClasses()) {
+            String pkg = c.getPackageName();
+            if (pkg == null || pkg.trim().isEmpty()) continue;
+            String key = key(pkg, c.getRepoName());
+            map.computeIfAbsent(key, k -> new int[]{0})[0]++;
         }
         return map;
     }
@@ -195,18 +252,29 @@ public class CandidateScoringService {
     /** Returns map of "pkg::repo" → outboundCount (distinct external classes imported) */
     private Map<String, Integer> fetchOutboundDeps() {
         Map<String, Integer> map = new HashMap<>();
-        try (Session s = driver.session()) {
-            s.run("""
-                    MATCH (a:Class)-[:IMPORTS]->(b:Class)
-                    WHERE a.packageName IS NOT NULL AND trim(a.packageName) <> ''
-                      AND (b.packageName <> a.packageName OR b.repoName <> a.repoName)
-                    RETURN a.packageName AS pkg, a.repoName AS repo, count(DISTINCT b) AS n
-                    """)
-             .list()
-             .forEach(r -> {
-                 String key = key(r.get("pkg").asString(""), r.get("repo").asString(""));
-                 map.put(key, r.get("n").asInt(0));
-             });
+        DefaultDirectedGraph<String, DefaultEdge> graph = store.importGraph();
+
+        for (ClassEntity a : store.allClasses()) {
+            String aPkg = a.getPackageName();
+            if (aPkg == null || aPkg.trim().isEmpty()) continue;
+
+            String fqn = a.getFullyQualifiedName();
+            if (!graph.containsVertex(fqn)) continue;
+
+            Set<ClassEntity> distinctExternal = new HashSet<>();
+            for (DefaultEdge edge : graph.outgoingEdgesOf(fqn)) {
+                String targetFqn = graph.getEdgeTarget(edge);
+                ClassEntity b = store.findClassByFqn(targetFqn).orElse(null);
+                if (b == null) continue;
+                String bPkg = b.getPackageName();
+                if (!aPkg.equals(bPkg) || !a.getRepoName().equals(b.getRepoName())) {
+                    distinctExternal.add(b);
+                }
+            }
+            if (!distinctExternal.isEmpty()) {
+                String aKey = key(aPkg, a.getRepoName());
+                map.merge(aKey, distinctExternal.size(), Integer::sum);
+            }
         }
         return map;
     }
@@ -214,37 +282,44 @@ public class CandidateScoringService {
     /** Returns map of "pkg::repo" → inboundCount (distinct external classes that import us) */
     private Map<String, Integer> fetchInboundDeps() {
         Map<String, Integer> map = new HashMap<>();
-        try (Session s = driver.session()) {
-            s.run("""
-                    MATCH (x:Class)-[:IMPORTS]->(y:Class)
-                    WHERE y.packageName IS NOT NULL AND trim(y.packageName) <> ''
-                      AND (x.packageName <> y.packageName OR x.repoName <> y.repoName)
-                    RETURN y.packageName AS pkg, y.repoName AS repo, count(DISTINCT x) AS n
-                    """)
-             .list()
-             .forEach(r -> {
-                 String key = key(r.get("pkg").asString(""), r.get("repo").asString(""));
-                 map.put(key, r.get("n").asInt(0));
-             });
+        DefaultDirectedGraph<String, DefaultEdge> graph = store.importGraph();
+
+        for (ClassEntity y : store.allClasses()) {
+            String yPkg = y.getPackageName();
+            if (yPkg == null || yPkg.trim().isEmpty()) continue;
+
+            String fqn = y.getFullyQualifiedName();
+            if (!graph.containsVertex(fqn)) continue;
+
+            Set<ClassEntity> distinctExternal = new HashSet<>();
+            for (DefaultEdge edge : graph.incomingEdgesOf(fqn)) {
+                String sourceFqn = graph.getEdgeSource(edge);
+                ClassEntity x = store.findClassByFqn(sourceFqn).orElse(null);
+                if (x == null) continue;
+                String xPkg = x.getPackageName();
+                if (!yPkg.equals(xPkg) || !y.getRepoName().equals(x.getRepoName())) {
+                    distinctExternal.add(x);
+                }
+            }
+            if (!distinctExternal.isEmpty()) {
+                String yKey = key(yPkg, y.getRepoName());
+                map.merge(yKey, distinctExternal.size(), Integer::sum);
+            }
         }
         return map;
     }
 
     /** Returns sorted simple class names for all given packages in a repo. */
     private List<String> fetchClassesForPackages(List<String> packages, String repo) {
-        if (packages.isEmpty()) return List.of();
-        try (Session s = driver.session()) {
-            return s.run(
-                    "MATCH (c:Class) " +
-                    "WHERE c.repoName = $repo AND c.packageName IN $pkgs " +
-                    "RETURN coalesce(c.simpleName, c.fullyQualifiedName) AS name " +
-                    "ORDER BY c.packageName, c.simpleName",
-                    Map.of("repo", repo, "pkgs", packages))
-             .list(r -> r.get("name").asString(""))
-             .stream()
-             .filter(n -> !n.isBlank())
-             .toList();
-        }
+        if (packages.isEmpty()) return Collections.emptyList();
+        Set<String> pkgSet = new HashSet<>(packages);
+        return store.allClasses().stream()
+                .filter(c -> repo.equals(c.getRepoName()) && pkgSet.contains(c.getPackageName()))
+                .map(c -> c.getSimpleName() != null && !c.getSimpleName().trim().isEmpty()
+                        ? c.getSimpleName() : c.getFullyQualifiedName())
+                .filter(n -> n != null && !n.trim().isEmpty())
+                .sorted()
+                .collect(Collectors.toList());
     }
 
     // ── Scoring utilities ─────────────────────────────────────────────

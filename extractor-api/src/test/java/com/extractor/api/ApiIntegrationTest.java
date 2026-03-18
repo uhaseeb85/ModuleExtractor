@@ -8,9 +8,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
-import org.testcontainers.containers.Neo4jContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -19,24 +16,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /**
  * End-to-end Spring Boot integration tests for the REST API.
- * Uses Testcontainers for Neo4j and MockMvc for HTTP assertions.
+ * Uses the in-memory JGraphT store (no external infrastructure required).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
-@Testcontainers
 class ApiIntegrationTest {
 
-    @Container
-    static Neo4jContainer<?> neo4j = new Neo4jContainer<>("neo4j:5-community")
-            .withoutAuthentication();
-
     @DynamicPropertySource
-    static void neo4jProperties(DynamicPropertyRegistry registry) {
-        registry.add("spring.neo4j.uri", neo4j::getBoltUrl);
-        registry.add("spring.neo4j.authentication.username", () -> "neo4j");
-        registry.add("spring.neo4j.authentication.password", () -> "");
+    static void props(DynamicPropertyRegistry registry) {
         // No repos configured — keeps test lightweight
         registry.add("extractor.repos", () -> "");
+        registry.add("extractor.git.cloneOnStartup", () -> "false");
     }
 
     @Autowired

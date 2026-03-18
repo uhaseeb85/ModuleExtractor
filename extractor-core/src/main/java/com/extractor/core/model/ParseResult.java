@@ -1,32 +1,59 @@
 package com.extractor.core.model;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * The result of parsing a single Java source file.
  * Produced by {@link com.extractor.core.interfaces.JavaSourceParser} and consumed by
  * {@link com.extractor.core.interfaces.GraphBuilder}.
- *
- * @param classNode   The primary class/interface/enum/record declared in the file.
- * @param methods     All methods extracted from the file (same as classNode.methods(), included for convenience).
- * @param fields      All fields extracted from the file.
- * @param imports     All static and non-static import edges from this file.
- * @param calls       All method call edges detected in this file.
- * @param annotations All annotation edges detected on types, methods, and fields.
  */
-public record ParseResult(
-        ClassNode classNode,
-        List<MethodNode> methods,
-        List<FieldNode> fields,
-        List<ImportEdge> imports,
-        List<CallEdge> calls,
-        List<AnnotationEdge> annotations
-) {
-    public ParseResult {
-        methods = methods == null ? List.of() : List.copyOf(methods);
-        fields = fields == null ? List.of() : List.copyOf(fields);
-        imports = imports == null ? List.of() : List.copyOf(imports);
-        calls = calls == null ? List.of() : List.copyOf(calls);
-        annotations = annotations == null ? List.of() : List.copyOf(annotations);
+public final class ParseResult {
+
+    private final ClassNode classNode;
+    private final List<MethodNode> methods;
+    private final List<FieldNode> fields;
+    private final List<ImportEdge> imports;
+    private final List<CallEdge> calls;
+    private final List<AnnotationEdge> annotations;
+
+    public ParseResult(ClassNode classNode, List<MethodNode> methods, List<FieldNode> fields,
+                       List<ImportEdge> imports, List<CallEdge> calls, List<AnnotationEdge> annotations) {
+        this.classNode   = classNode;
+        this.methods     = safeUnmodifiable(methods);
+        this.fields      = safeUnmodifiable(fields);
+        this.imports     = safeUnmodifiable(imports);
+        this.calls       = safeUnmodifiable(calls);
+        this.annotations = safeUnmodifiable(annotations);
+    }
+
+    private static <T> List<T> safeUnmodifiable(List<T> list) {
+        if (list == null) return Collections.emptyList();
+        return Collections.unmodifiableList(new ArrayList<T>(list));
+    }
+
+    public ClassNode getClassNode() { return classNode; }
+    public List<MethodNode> getMethods() { return methods; }
+    public List<FieldNode> getFields() { return fields; }
+    public List<ImportEdge> getImports() { return imports; }
+    public List<CallEdge> getCalls() { return calls; }
+    public List<AnnotationEdge> getAnnotations() { return annotations; }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof ParseResult)) return false;
+        ParseResult that = (ParseResult) o;
+        return Objects.equals(classNode, that.classNode);
+    }
+
+    @Override
+    public int hashCode() { return Objects.hash(classNode); }
+
+    @Override
+    public String toString() {
+        return "ParseResult{classNode=" + classNode + "}";
     }
 }

@@ -38,6 +38,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * JavaParser-backed implementation of {@link JavaSourceParser}.
@@ -97,9 +98,9 @@ public class JavaSourceParserImpl implements JavaSourceParser {
     @Override
     public ParseResult parse(Path javaFile, RepoConfig repo) throws ParseException {
         try {
-            var parseResult = javaParser.parse(javaFile);
+            com.github.javaparser.ParseResult<CompilationUnit> parseResult = javaParser.parse(javaFile);
 
-            if (!parseResult.isSuccessful() || parseResult.getResult().isEmpty()) {
+            if (!parseResult.isSuccessful() || !parseResult.getResult().isPresent()) {
                 String problems = parseResult.getProblems().toString();
                 throw new ParseException("Parse failed for " + javaFile + ": " + problems, javaFile);
             }
@@ -130,7 +131,7 @@ public class JavaSourceParserImpl implements JavaSourceParser {
         }
 
         ClassType classType = resolveClassType(primaryType);
-        boolean isAbstract = primaryType instanceof ClassOrInterfaceDeclaration c && c.isAbstract();
+        boolean isAbstract = (primaryType instanceof ClassOrInterfaceDeclaration) && ((ClassOrInterfaceDeclaration) primaryType).isAbstract();
         String fqn = packageName.isEmpty()
                 ? primaryType.getNameAsString()
                 : packageName + "." + primaryType.getNameAsString();
@@ -149,7 +150,7 @@ public class JavaSourceParserImpl implements JavaSourceParser {
             methods.add(new MethodNode(
                     sig, md.getNameAsString(), md.getTypeAsString(),
                     md.getAccessSpecifier().asString(), md.isStatic(),
-                    repo.name(), md.getBegin().map(p -> p.line).orElse(0), methodJavadoc));
+                    repo.getName(), md.getBegin().map(p -> p.line).orElse(0), methodJavadoc));
         }
 
         // Fields
@@ -157,11 +158,11 @@ public class JavaSourceParserImpl implements JavaSourceParser {
         for (FieldDeclaration fd : primaryType.getFields()) {
             List<String> fieldAnnotations = fd.getAnnotations().stream()
                     .map(AnnotationExpr::getNameAsString)
-                    .toList();
+                    .collect(Collectors.toList());
             String visibility = fd.getAccessSpecifier().asString();
             String fieldType = fd.getElementType().asString();
             fd.getVariables().forEach(v ->
-                    fields.add(new FieldNode(v.getNameAsString(), fieldType, visibility, fieldAnnotations, repo.name())));
+                    fields.add(new FieldNode(v.getNameAsString(), fieldType, visibility, fieldAnnotations, repo.getName())));
         }
 
         // Import edges
@@ -173,7 +174,7 @@ public class JavaSourceParserImpl implements JavaSourceParser {
         });
 
         // Call edges (best-effort — only method calls that can be resolved)
-        List<CallEdge> calls = extractCallEdges(cu, fqn, repo.name());
+        List<CallEdge> calls = extractCallEdges(cu, fqn, repo.getName());
 
         // Annotation edges
         List<AnnotationEdge> annotations = new ArrayList<>();
@@ -185,7 +186,7 @@ public class JavaSourceParserImpl implements JavaSourceParser {
         }
 
         ClassNode classNode = new ClassNode(fqn, primaryType.getNameAsString(), classType,
-                isAbstract, repo.name(), javadoc, methods, fields, typeAnnotations, packageName,
+                isAbstract, repo.getName(), javadoc, methods, fields, typeAnnotations, packageName,
                 primaryType.getBegin().map(p -> p.line).orElse(0));
 
         return new ParseResult(classNode, methods, fields, imports, calls, annotations);
@@ -195,7 +196,7 @@ public class JavaSourceParserImpl implements JavaSourceParser {
         List<CallEdge> calls = new ArrayList<>();
         cu.findAll(MethodCallExpr.class).forEach(mce -> {
             try {
-                var resolved = mce.resolve();
+                com.github.javaparser.resolution.declarations.ResolvedMethodDeclaration resolved = mce.resolve();
                 String calleeFqn = resolved.declaringType().getQualifiedName();
                 String calleeMethod = resolved.getName();
                 String callerMethod = mce.findAncestor(MethodDeclaration.class)
@@ -213,7 +214,8 @@ public class JavaSourceParserImpl implements JavaSourceParser {
 
     private ClassType resolveClassType(TypeDeclaration<?> type) {
         if (type instanceof EnumDeclaration) return ClassType.ENUM;
-        if (type instanceof ClassOrInterfaceDeclaration c) {
+        if (type instanceof ClassOrInterfaceDeclaration) {
+            ClassOrInterfaceDeclaration c = (ClassOrInterfaceDeclaration) type;
             if (c.isInterface()) return ClassType.INTERFACE;
             if (c.isAnnotationDeclaration()) return ClassType.ANNOTATION;
             return ClassType.CLASS;

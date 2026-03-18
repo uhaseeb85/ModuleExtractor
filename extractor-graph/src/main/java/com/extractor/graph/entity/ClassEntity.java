@@ -1,68 +1,38 @@
 package com.extractor.graph.entity;
 
 import com.extractor.core.enums.ClassType;
-import org.springframework.data.neo4j.core.schema.GeneratedValue;
-import org.springframework.data.neo4j.core.schema.Id;
-import org.springframework.data.neo4j.core.schema.Node;
-import org.springframework.data.neo4j.core.schema.Property;
-import org.springframework.data.neo4j.core.schema.Relationship;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 /**
- * Neo4j node representing a Java class, interface, enum, annotation, or record.
+ * Plain-POJO representing a Java class, interface, enum, annotation, or record.
+ * Stored in-memory via {@link com.extractor.graph.store.GraphStore}.
  */
-@Node("Class")
 public class ClassEntity {
 
-    @Id
-    @GeneratedValue
-    private Long id;
-
-    @Property(name = "fullyQualifiedName")
     private String fullyQualifiedName;
-
-    @Property(name = "simpleName")
     private String simpleName;
-
-    @Property(name = "classType")
     private String classType;
-
-    @Property(name = "isAbstract")
     private boolean isAbstract;
-
-    @Property(name = "repoName")
     private String repoName;
-
-    @Property(name = "packageName")
     private String packageName;
-
-    @Property(name = "lineNumber")
     private int lineNumber;
-
-    @Property(name = "javadoc")
     private String javadoc;
 
-    // ── Relationships ──────────────────────────────────────────────────
+    // ── Relationships (in-memory lists) ────────────────────────────────
 
-    @Relationship(type = "CONTAINS", direction = Relationship.Direction.OUTGOING)
     private List<MethodEntity> methods = new ArrayList<>();
-
-    @Relationship(type = "CONTAINS", direction = Relationship.Direction.OUTGOING)
     private List<FieldEntity> fields = new ArrayList<>();
 
-    @Relationship(type = "IMPORTS", direction = Relationship.Direction.OUTGOING)
+    /** Direct import targets (resolved lazily during graph build). */
     private List<ClassEntity> imports = new ArrayList<>();
 
-    @Relationship(type = "EXTENDS", direction = Relationship.Direction.OUTGOING)
     private ClassEntity superClass;
-
-    @Relationship(type = "IMPLEMENTS", direction = Relationship.Direction.OUTGOING)
     private List<ClassEntity> implementedInterfaces = new ArrayList<>();
 
-    @Relationship(type = "ANNOTATED_WITH", direction = Relationship.Direction.OUTGOING)
+    /** Annotation classes applied to this class (e.g. @Entity, @Service). */
     private List<ClassEntity> annotations = new ArrayList<>();
 
     protected ClassEntity() {}
@@ -78,7 +48,8 @@ public class ClassEntity {
         this.lineNumber = lineNumber;
     }
 
-    public Long getId() { return id; }
+    /** Synthetic ID derived from FQN hashCode (replaces Neo4j generated ID). */
+    public Long getId() { return fullyQualifiedName != null ? (long) fullyQualifiedName.hashCode() : null; }
     public String getFullyQualifiedName() { return fullyQualifiedName; }
     public String getSimpleName() { return simpleName; }
     public String getClassType() { return classType; }
@@ -104,7 +75,8 @@ public class ClassEntity {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof ClassEntity that)) return false;
+        if (!(o instanceof ClassEntity)) return false;
+        ClassEntity that = (ClassEntity) o;
         return Objects.equals(fullyQualifiedName, that.fullyQualifiedName);
     }
 

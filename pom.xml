@@ -22,14 +22,16 @@
     </modules>
 
     <properties>
-        <java.version>21</java.version>
-        <maven.compiler.release>21</maven.compiler.release>
+        <java.version>8</java.version>
+        <maven.compiler.release>8</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- Framework versions -->
-        <spring-boot.version>3.2.0</spring-boot.version>
-        <spring-data-neo4j.version>7.3.0</spring-data-neo4j.version>
+        <spring-boot.version>2.7.18</spring-boot.version>
+
+        <!-- Graph library (replaces Neo4j) -->
+        <jgrapht.version>1.5.2</jgrapht.version>
 
         <!-- Parsing & Analysis -->
         <javaparser.version>3.25.4</javaparser.version>
@@ -191,7 +193,7 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>${maven-compiler-plugin.version}</version>
                     <configuration>
-                        <release>21</release>
+                        <release>${maven.compiler.release}</release>
                         <parameters>true</parameters>
                         <annotationProcessorPaths>
                             <path>

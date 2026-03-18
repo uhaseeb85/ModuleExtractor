@@ -1,27 +1,5 @@
 services:
 
-  neo4j:
-    image: neo4j:5-community
-    container_name: extractor-neo4j
-    environment:
-      NEO4J_AUTH: neo4j/extractor123
-      NEO4J_PLUGINS: '["apoc"]'
-      NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
-      NEO4J_dbms_security_procedures_allowlist: "apoc.*"
-    ports:
-      - "7474:7474"   # browser
-      - "7687:7687"   # bolt
-    volumes:
-      - neo4j_data:/data
-      - neo4j_logs:/logs
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-    networks:
-      - extractor-net
-
   extractor-api:
     image: extractor-api:latest
     build:
@@ -29,10 +7,6 @@ services:
       dockerfile: extractor-api/Dockerfile
     container_name: extractor-api
     environment:
-      SPRING_NEO4J_URI: bolt://neo4j:7687
-      SPRING_NEO4J_AUTHENTICATION_USERNAME: neo4j
-      SPRING_NEO4J_AUTHENTICATION_PASSWORD: extractor123
-
       # ── Add your repositories here ────────────────────────────────────────
       # Each repo needs a sequential index (0, 1, 2, …).
       # buildTool must be MAVEN or GRADLE.
@@ -60,12 +34,9 @@ services:
 
       EXTRACTOR_GIT_CLONEONSTARTUP: "true"
     ports:
-      - "8081:8080"
+      - "8081:8081"
     volumes:
       - repo_clones:/repos
-    depends_on:
-      neo4j:
-        condition: service_healthy
     networks:
       - extractor-net
 
@@ -83,8 +54,6 @@ services:
       - extractor-net
 
 volumes:
-  neo4j_data:
-  neo4j_logs:
   repo_clones:
 
 networks:

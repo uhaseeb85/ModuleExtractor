@@ -13,7 +13,7 @@
 
     <artifactId>extractor-graph</artifactId>
     <name>Extractor Graph</name>
-    <description>Neo4j entities, Spring Data repositories, and GraphBuilderImpl</description>
+    <description>JGraphT in-memory graph, entity store, and GraphBuilderImpl</description>
 
     <dependencies>
         <dependency>
@@ -21,10 +21,11 @@
             <artifactId>extractor-core</artifactId>
         </dependency>
 
-        <!-- Spring Data Neo4j -->
+        <!-- JGraphT: in-memory directed graph (replaces Neo4j) -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-neo4j</artifactId>
+            <groupId>org.jgrapht</groupId>
+            <artifactId>jgrapht-core</artifactId>
+            <version>${jgrapht.version}</version>
         </dependency>
 
         <!-- Spring context for @EventListener, @Transactional etc. -->
@@ -37,11 +38,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.testcontainers</groupId>
-            <artifactId>neo4j</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

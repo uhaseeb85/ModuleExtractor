@@ -6,6 +6,7 @@ import com.extractor.core.model.RepoConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -27,7 +28,7 @@ class MavenBuildParserImplTest {
 
     private final MavenBuildParserImpl parser = new MavenBuildParserImpl();
     private final RepoConfig repoConfig = new RepoConfig(
-            "test-project", "file://local", "main", BuildTool.MAVEN, projectDir);
+            "test-project", "file://local", "main", BuildTool.MAVEN, projectDir.toString());
 
     // ── Tests ──────────────────────────────────────────────────────
 
@@ -39,15 +40,15 @@ class MavenBuildParserImplTest {
 
     @Test
     void simplePomCoordinatesResolved() throws Exception {
-        Files.writeString(projectDir.resolve("pom.xml"), """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>my-service</artifactId>
-                  <version>2.0.0</version>
-                </project>
-                """);
+        Files.write(projectDir.resolve("pom.xml"), (
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                "<project>\n" +
+                "  <modelVersion>4.0.0</modelVersion>\n" +
+                "  <groupId>com.example</groupId>\n" +
+                "  <artifactId>my-service</artifactId>\n" +
+                "  <version>2.0.0</version>\n" +
+                "</project>\n"
+        ).getBytes(StandardCharsets.UTF_8));
 
         // We can't run real Maven in tests — just verify pom.xml is present
         // and that the parser accepts this directory without throwing at validation stage.
@@ -57,34 +58,34 @@ class MavenBuildParserImplTest {
     @Test
     void multiModulePomStructure() throws Exception {
         // Create a multi-module POM structure
-        Files.writeString(projectDir.resolve("pom.xml"), """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.example</groupId>
-                  <artifactId>parent</artifactId>
-                  <version>1.0.0</version>
-                  <packaging>pom</packaging>
-                  <modules>
-                    <module>api</module>
-                    <module>core</module>
-                  </modules>
-                </project>
-                """);
+        Files.write(projectDir.resolve("pom.xml"), (
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                "<project>\n" +
+                "  <modelVersion>4.0.0</modelVersion>\n" +
+                "  <groupId>com.example</groupId>\n" +
+                "  <artifactId>parent</artifactId>\n" +
+                "  <version>1.0.0</version>\n" +
+                "  <packaging>pom</packaging>\n" +
+                "  <modules>\n" +
+                "    <module>api</module>\n" +
+                "    <module>core</module>\n" +
+                "  </modules>\n" +
+                "</project>\n"
+        ).getBytes(StandardCharsets.UTF_8));
 
         Path apiDir = projectDir.resolve("api");
         Files.createDirectories(apiDir);
-        Files.writeString(apiDir.resolve("pom.xml"), """
-                <?xml version="1.0" encoding="UTF-8"?>
-                <project>
-                  <parent>
-                    <groupId>com.example</groupId>
-                    <artifactId>parent</artifactId>
-                    <version>1.0.0</version>
-                  </parent>
-                  <artifactId>api</artifactId>
-                </project>
-                """);
+        Files.write(apiDir.resolve("pom.xml"), (
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                "<project>\n" +
+                "  <parent>\n" +
+                "    <groupId>com.example</groupId>\n" +
+                "    <artifactId>parent</artifactId>\n" +
+                "    <version>1.0.0</version>\n" +
+                "  </parent>\n" +
+                "  <artifactId>api</artifactId>\n" +
+                "</project>\n"
+        ).getBytes(StandardCharsets.UTF_8));
 
         assertThat(projectDir.resolve("pom.xml")).exists();
         assertThat(apiDir.resolve("pom.xml")).exists();

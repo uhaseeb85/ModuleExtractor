@@ -7,6 +7,7 @@ import com.extractor.core.model.DependsOnEdge;
 import com.extractor.core.model.RepoConfig;
 import org.gradle.tooling.GradleConnector;
 import org.gradle.tooling.ProjectConnection;
+import org.gradle.tooling.model.eclipse.EclipseExternalDependency;
 import org.gradle.tooling.model.eclipse.EclipseProject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +42,7 @@ public class GradleBuildParserImpl implements BuildFileParser {
 
         String fromArtifactId = projectDir.getFileName().toString();
 
-        for (var classpathEntry : eclipseProject.getClasspath()) {
+        for (EclipseExternalDependency classpathEntry : eclipseProject.getClasspath()) {
             Path jarPath = classpathEntry.getFile().toPath();
             // Derive coordinates from the JAR file name heuristically;
             // production code should use the Dependency model from Gradle tooling
@@ -50,10 +51,10 @@ public class GradleBuildParserImpl implements BuildFileParser {
             edges.add(new DependsOnEdge(
                     "com.unknown", fromArtifactId, "unspecified",
                     coords[0], coords[1], coords[2],
-                    "compile", false, repo.name()));
+                    "compile", false, repo.getName()));
         }
 
-        log.debug("Resolved {} Gradle dependencies for repo '{}'", edges.size(), repo.name());
+        log.debug("Resolved {} Gradle dependencies for repo '{}'", edges.size(), repo.getName());
         return edges;
     }
 
@@ -63,13 +64,13 @@ public class GradleBuildParserImpl implements BuildFileParser {
         List<Path> jarPaths = new ArrayList<>();
         EclipseProject eclipseProject = fetchEclipseModel(projectDir, repo);
 
-        for (var classpathEntry : eclipseProject.getClasspath()) {
+        for (EclipseExternalDependency classpathEntry : eclipseProject.getClasspath()) {
             File file = classpathEntry.getFile();
             if (file != null && file.exists() && file.getName().endsWith(".jar")) {
                 jarPaths.add(file.toPath());
             }
         }
-        log.debug("Resolved {} JAR paths for repo '{}'", jarPaths.size(), repo.name());
+        log.debug("Resolved {} JAR paths for repo '{}'", jarPaths.size(), repo.getName());
         return jarPaths;
     }
 

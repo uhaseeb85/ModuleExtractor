@@ -18,8 +18,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -78,7 +80,7 @@ public class IngestionOrchestrator {
     public SyncJobStatus triggerFullSync() {
         SyncJobStatus job = new SyncJobStatus();
         jobs.put(job.getJobId(), job);
-        List<RepoConfig> snapshot = List.copyOf(configuredRepos);
+        List<RepoConfig> snapshot = new ArrayList<>(configuredRepos);
         CompletableFuture.runAsync(() -> runSync(job, snapshot));
         return job;
     }
@@ -92,10 +94,10 @@ public class IngestionOrchestrator {
      */
     public Optional<SyncJobStatus> triggerSingleRepoSync(String repoName) {
         Optional<RepoConfig> repoConfig = configuredRepos.stream()
-                .filter(r -> r.name().equals(repoName))
+                .filter(r -> r.getName().equals(repoName))
                 .findFirst();
 
-        if (repoConfig.isEmpty()) {
+        if (!repoConfig.isPresent()) {
             log.warn("Sync requested for unknown repo '{}'", repoName);
             return Optional.empty();
         }
@@ -103,7 +105,7 @@ public class IngestionOrchestrator {
         SyncJobStatus job = new SyncJobStatus();
         jobs.put(job.getJobId(), job);
         RepoConfig cfg = repoConfig.get();
-        CompletableFuture.runAsync(() -> runSync(job, List.of(cfg)));
+        CompletableFuture.runAsync(() -> runSync(job, Collections.singletonList(cfg)));
         return Optional.of(job);
     }
 
@@ -118,7 +120,7 @@ public class IngestionOrchestrator {
      * Returns the runtime list of all configured repos.
      */
     public List<RepoConfig> getConfiguredRepos() {
-        return List.copyOf(configuredRepos);
+        return new ArrayList<>(configuredRepos);
     }
 
     /**
@@ -126,12 +128,12 @@ public class IngestionOrchestrator {
      * Throws {@link IllegalArgumentException} if a repo with the same name already exists.
      */
     public RepoConfig addRepo(RepoConfig config) {
-        boolean exists = configuredRepos.stream().anyMatch(r -> r.name().equals(config.name()));
+        boolean exists = configuredRepos.stream().anyMatch(r -> r.getName().equals(config.getName()));
         if (exists) {
-            throw new IllegalArgumentException("Repository '" + config.name() + "' is already registered.");
+            throw new IllegalArgumentException("Repository '" + config.getName() + "' is already registered.");
         }
         configuredRepos.add(config);
-        log.info("Registered new repo '{}' ({})", config.name(), config.url());
+        log.info("Registered new repo '{}' ({})", config.getName(), config.getUrl());
         return config;
     }
 
@@ -141,7 +143,7 @@ public class IngestionOrchestrator {
      * @return {@code true} if removed, {@code false} if not found.
      */
     public boolean removeRepo(String name) {
-        boolean removed = configuredRepos.removeIf(r -> r.name().equals(name));
+        boolean removed = configuredRepos.removeIf(r -> r.getName().equals(name));
         if (removed) {
             log.info("Removed repo '{}'", name);
         }
@@ -169,19 +171,19 @@ public class IngestionOrchestrator {
             // This must happen before parsing so CombinedTypeSolver has the full classpath
             List<String> headShas = new ArrayList<>();
             for (RepoConfig repo : repos) {
-                job.setCurrentRepo(repo.name());
+                job.setCurrentRepo(repo.getName());
                 try {
-                    log.info("Syncing repo '{}'", repo.name());
+                    log.info("Syncing repo '{}'", repo.getName());
                     String sha = repoScanner.syncRepo(repo);
                     headShas.add(sha);
 
                     // Register source root for cross-repo type resolution
-                    Path sourceRoot = Path.of(repo.localPath(), "src", "main", "java");
+                    Path sourceRoot = Paths.get(repo.getLocalPath(), "src", "main", "java");
                     javaSourceParser.registerSourceRoot(sourceRoot);
 
                 } catch (Exception e) {
-                    log.error("Failed to sync repo '{}': {}", repo.name(), e.getMessage());
-                    job.addError("Sync failed for " + repo.name() + ": " + e.getMessage());
+                    log.error("Failed to sync repo '{}': {}", repo.getName(), e.getMessage());
+                    job.addError("Sync failed for " + repo.getName() + ": " + e.getMessage());
                 }
             }
 
@@ -189,8 +191,8 @@ public class IngestionOrchestrator {
             for (int i = 0; i < repos.size(); i++) {
                 RepoConfig repo = repos.get(i);
                 try {
-                    BuildFileParser parser = findParser(repo.buildTool());
-                    Path projectDir = Path.of(repo.localPath());
+                    BuildFileParser parser = findParser(repo.getBuildTool());
+                    Path projectDir = Paths.get(repo.getLocalPath());
 
                     List<Path> jarPaths = parser.resolveJarPaths(projectDir, repo);
                     jarPaths.forEach(javaSourceParser::registerJar);
@@ -198,19 +200,19 @@ public class IngestionOrchestrator {
                     List<DependsOnEdge> deps = parser.resolveDependencies(projectDir, repo);
                     graphBuilder.persistDependencies(deps);
 
-                    log.info("Resolved {} dependencies for '{}'", deps.size(), repo.name());
+                    log.info("Resolved {} dependencies for '{}'", deps.size(), repo.getName());
                 } catch (Exception e) {
-                    log.error("Build parse failed for repo '{}': {}", repo.name(), e.getMessage());
-                    job.addError("Build parse failed for " + repo.name() + ": " + e.getMessage());
+                    log.error("Build parse failed for repo '{}': {}", repo.getName(), e.getMessage());
+                    job.addError("Build parse failed for " + repo.getName() + ": " + e.getMessage());
                 }
             }
 
             // Phase 3: Parse Java source files and persist to graph
             for (RepoConfig repo : repos) {
-                job.setCurrentRepo(repo.name());
+                job.setCurrentRepo(repo.getName());
                 try {
                     List<Path> javaFiles = repoScanner.getChangedFiles(repo, null);
-                    log.info("Parsing {} Java files for repo '{}'", javaFiles.size(), repo.name());
+                    log.info("Parsing {} Java files for repo '{}'", javaFiles.size(), repo.getName());
 
                     List<ParseResult> batch = new ArrayList<>();
                     for (Path javaFile : javaFiles) {
@@ -230,8 +232,8 @@ public class IngestionOrchestrator {
                     }
 
                 } catch (Exception e) {
-                    log.error("Ingestion failed for repo '{}': {}", repo.name(), e.getMessage());
-                    job.addError("Ingestion failed for " + repo.name() + ": " + e.getMessage());
+                    log.error("Ingestion failed for repo '{}': {}", repo.getName(), e.getMessage());
+                    job.addError("Ingestion failed for " + repo.getName() + ": " + e.getMessage());
                 }
 
                 done++;

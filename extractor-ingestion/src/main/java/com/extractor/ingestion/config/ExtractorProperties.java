@@ -6,6 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Binds the {@code extractor} section of {@code application.yml} / {@code repos.yml}.
@@ -40,7 +41,7 @@ public class ExtractorProperties {
         return repos.stream()
                 .map(r -> new RepoConfig(r.getName(), r.getUrl(), r.getBranch(),
                         BuildTool.valueOf(r.getBuildTool().toUpperCase()), r.getLocalPath()))
-                .toList();
+                .collect(Collectors.toList());
     }
 
     // ── Nested property classes ─────────────────────────────────────────
