@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, SyncJobResponse } from '../api/client'
 import AddRepoModal from '../components/AddRepoModal'
+import ScanDirectoryModal from '../components/ScanDirectoryModal'
 
 export default function ReposPage() {
   const queryClient = useQueryClient()
   const [showAddModal, setShowAddModal] = useState(false)
+  const [showScanModal, setShowScanModal] = useState(false)
   // repoName → latest job response
   const [jobs, setJobs] = useState<Record<string, SyncJobResponse>>({})
 
@@ -84,6 +86,12 @@ export default function ReposPage() {
                 : 'Sync All'}
             </button>
           )}
+          <button
+            onClick={() => setShowScanModal(true)}
+            className="rounded bg-gray-700 px-3 py-1.5 text-xs font-semibold hover:bg-gray-600"
+          >
+            📂 Scan Local Directory
+          </button>
           <button
             onClick={() => setShowAddModal(true)}
             className="rounded bg-indigo-600 px-3 py-1.5 text-xs font-semibold hover:bg-indigo-500"
@@ -194,6 +202,7 @@ export default function ReposPage() {
       )}
 
       <AddRepoModal open={showAddModal} onClose={() => setShowAddModal(false)} />
+      <ScanDirectoryModal open={showScanModal} onClose={() => setShowScanModal(false)} />
     </div>
   )
 }

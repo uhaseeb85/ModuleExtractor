@@ -121,6 +121,43 @@ curl http://localhost:8081/api/v1/ingestion/jobs/{jobId}
 | `POST` | `/api/v1/ingestion/sync/{repoName}` | Trigger single-repo sync |
 | `GET` | `/api/v1/ingestion/jobs/{jobId}` | Poll job status |
 | `GET` | `/api/v1/ingestion/repos` | List configured repos |
+| `POST` | `/api/v1/ingestion/repos` | Register a single repo at runtime |
+| `DELETE` | `/api/v1/ingestion/repos/{name}` | Remove a repo from the list (keeps cloned files) |
+| `POST` | `/api/v1/ingestion/scan-directory` | Scan a local directory for git repos and register all of them |
+
+### Scanning a local directory
+
+Use `POST /api/v1/ingestion/scan-directory` to point the extractor at a local filesystem path
+that contains one or more git repositories.  Each discovered repo is registered and processed
+through the same pipeline as GitHub repos — build tool is auto-detected from `pom.xml` (Maven)
+or `build.gradle` (Gradle).
+
+```jsonc
+// Request body
+{
+  "directoryPath": "/local-repos",   // required — absolute path inside the container
+  "buildTool": "MAVEN",              // fallback when auto-detection fails
+  "branch": "main"                   // branch name recorded for each repo
+}
+```
+
+```bash
+# Optional: trigger ingestion immediately
+POST /api/v1/ingestion/scan-directory?sync=true
+```
+
+**Docker Compose — exposing your local repos to the container**
+
+The scan directory path must be accessible _inside_ the container.  Add a bind mount to
+`docker-compose.yml` for the `extractor-api` service:
+
+```yaml
+volumes:
+  - repo_clones:/repos
+  - /path/to/your/local/projects:/local-repos:ro   # ← add this line
+```
+
+Then restart the container and use `/local-repos` as the `directoryPath`.
 
 ### Graph
 
@@ -140,6 +177,12 @@ curl http://localhost:8081/api/v1/ingestion/jobs/{jobId}
 ```bash
 # All unit tests (no Docker or database needed)
 mvn test -DskipTests=false
+
+# Targeted unit tests
+mvn test -pl extractor-ingestion -Dtest="JavaSourceParserImplTest,MavenBuildParserImplTest,IngestionOrchestratorScanTest"
+
+# Integration tests (requires Docker for Testcontainers)
+mvn verify -pl extractor-graph,extractor-api
 
 # Specific module
 mvn test -pl extractor-graph

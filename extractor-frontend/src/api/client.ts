@@ -111,6 +111,16 @@ export interface AddRepoRequest {
   localPath: string
 }
 
+/** Payload for scanning a local directory for Git repositories. */
+export interface ScanDirectoryRequest {
+  /** Absolute path to scan (may be a single repo or a directory of repos). */
+  directoryPath: string
+  /** Fallback build tool when auto-detection fails. Defaults to MAVEN. */
+  buildTool: string
+  /** Branch name to record for each discovered repo. Defaults to main. */
+  branch: string
+}
+
 // ── API calls ─────────────────────────────────────────────────────────
 
 export const api = {
@@ -147,6 +157,13 @@ export const api = {
     send<{ repo: string; syncJobId?: string }>(
       'POST',
       `/ingestion/repos${triggerSync ? '?sync=true' : ''}`,
+      data
+    ),
+
+  scanDirectory: (data: ScanDirectoryRequest, triggerSync = false) =>
+    send<{ registered: string[]; syncJobId?: string; message?: string }>(
+      'POST',
+      `/ingestion/scan-directory${triggerSync ? '?sync=true' : ''}`,
       data
     ),
 
