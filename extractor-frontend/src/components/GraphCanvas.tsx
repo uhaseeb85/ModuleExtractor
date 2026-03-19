@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ReactFlow,
   Background,
@@ -143,8 +143,11 @@ export default function GraphCanvas({ nodes: rawNodes, edges: rawEdges, onNodeCl
     [rawEdges]
   )
 
-  const [flowNodes, , onNodesChange] = useNodesState(initialNodes)
-  const [flowEdges, , onEdgesChange] = useEdgesState(initialEdges)
+  const [flowNodes, setNodes, onNodesChange] = useNodesState(initialNodes)
+  const [flowEdges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
+
+  useEffect(() => { setNodes(initialNodes) }, [initialNodes, setNodes])
+  useEffect(() => { setEdges(initialEdges) }, [initialEdges, setEdges])
 
   const handleNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
