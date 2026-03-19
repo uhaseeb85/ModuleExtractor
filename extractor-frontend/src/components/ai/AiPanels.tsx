@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { AiAnalysisResponse, AiPipelineResponse } from '../../api/client'
 import {
   Sparkles, AlertTriangle, Loader2, ChevronDown, ChevronRight,
-  GitBranch, Map, Layers,
+  GitBranch, Map, Layers, Package,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
@@ -19,10 +19,16 @@ function TokenBadge({ resp }: { resp: AiAnalysisResponse }) {
   )
 }
 
+function stripCodeFences(raw: string): string {
+  const trimmed = raw.trim()
+  const match = trimmed.match(/^```(?:\w+)?\s*\n?([\s\S]*?)\n?\s*```$/)
+  return match ? match[1].trim() : trimmed
+}
+
 function parseJsonContent(content: string | null): unknown | null {
   if (!content) return null
   try {
-    return JSON.parse(content)
+    return JSON.parse(stripCodeFences(content))
   } catch {
     return null
   }
@@ -111,32 +117,83 @@ function BoundariesContent({ resp }: { resp: AiAnalysisResponse }) {
     )
   }
 
-  const suggested = (json.suggested_moves ?? json.suggestedMoves ?? []) as Array<Record<string, string>>
+  const boundaries = (json.refinedBoundaries ?? json.refined_boundaries ?? []) as Array<Record<string, unknown>>
+  const classesToMove = (json.classesToMove ?? json.classes_to_move ?? json.suggested_moves ?? json.suggestedMoves ?? []) as Array<Record<string, string>>
   const reasoning = (json.reasoning ?? json.summary ?? '') as string
 
+  const hasParsedContent = boundaries.length > 0 || classesToMove.length > 0 || reasoning
+
+  if (!hasParsedContent) {
+    return (
+      <pre className="whitespace-pre-wrap text-xs text-foreground font-mono leading-relaxed">
+        {JSON.stringify(json, null, 2)}
+      </pre>
+    )
+  }
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {reasoning && (
         <p className="text-xs text-muted-foreground leading-relaxed">{String(reasoning)}</p>
       )}
-      {suggested.length > 0 && (
+
+      {/* Refined module boundaries */}
+      {boundaries.length > 0 && (
         <div className="space-y-2">
-          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Suggested Moves</h4>
-          {suggested.map((item, i) => (
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Refined Modules ({boundaries.length})
+          </h4>
+          {boundaries.map((mod, i) => {
+            const pkgs = (mod.packages ?? []) as string[]
+            return (
+              <div key={i} className="rounded-lg border border-border/50 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Package className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-xs font-medium text-foreground">
+                    {String(mod.moduleName ?? mod.name ?? `Module ${i + 1}`)}
+                  </span>
+                  <Badge variant="secondary" className="ml-auto text-[10px]">{pkgs.length} packages</Badge>
+                </div>
+                {pkgs.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pl-5">
+                    {pkgs.map((p, j) => (
+                      <span key={j} className="inline-block rounded-md bg-accent/40 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                        {p}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {mod.reason != null && (
+                  <p className="text-xs text-muted-foreground pl-5">{String(mod.reason)}</p>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Classes to move */}
+      {classesToMove.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Classes to Move ({classesToMove.length})
+          </h4>
+          {classesToMove.map((item, i) => (
             <div key={i} className="rounded-lg bg-accent/30 p-3 space-y-1">
-              <p className="text-xs font-medium text-foreground">{item.class || item.className || item.name || `Item ${i + 1}`}</p>
-              <p className="text-xs text-muted-foreground">{item.reason || item.rationale || ''}</p>
+              <p className="text-xs font-medium text-foreground">
+                {item.className || item.class || item.name || `Class ${i + 1}`}
+              </p>
               {item.from && item.to && (
-                <p className="text-[10px] text-muted-foreground/70 font-mono">{item.from} → {item.to}</p>
+                <p className="text-[10px] font-mono text-muted-foreground/70">
+                  {item.from} → {item.to}
+                </p>
+              )}
+              {(item.reason || item.rationale) && (
+                <p className="text-xs text-muted-foreground">{item.reason || item.rationale}</p>
               )}
             </div>
           ))}
         </div>
-      )}
-      {!reasoning && suggested.length === 0 && (
-        <pre className="whitespace-pre-wrap text-xs text-foreground font-mono leading-relaxed">
-          {JSON.stringify(json, null, 2)}
-        </pre>
       )}
     </div>
   )
