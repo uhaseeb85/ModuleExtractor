@@ -1,12 +1,23 @@
-import { useEffect, useRef, useState } from 'react'
-import cytoscape from 'cytoscape'
-// @ts-expect-error — no official TS types for this layout
-import coseBilkent from 'cytoscape-cose-bilkent'
+import { useCallback, useMemo, useState } from 'react'
+import {
+  ReactFlow,
+  Background,
+  Controls,
+  MiniMap,
+  type Node,
+  type Edge,
+  type NodeProps,
+  Handle,
+  Position,
+  useNodesState,
+  useEdgesState,
+} from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
+import { X } from 'lucide-react'
 import type { GraphEdgeResponse, GraphNodeResponse } from '../api/client'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
 
-cytoscape.use(coseBilkent)
-
-// ── Palette: one colour per repo (up to 12) ─────────────────────────
 const PALETTE = [
   '#6366f1', '#10b981', '#f59e0b', '#ef4444',
   '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6',
@@ -18,141 +29,177 @@ function repoColour(repo: string, index: Map<string, number>): string {
   return PALETTE[index.get(repo)! % PALETTE.length]
 }
 
+// ── Custom node ──────────────────────────────────────────────────────
+
+type ClassNodeData = {
+  label: string
+  repo: string
+  colour: string
+  methodCount: number
+  classType: string
+}
+
+function ClassNode({ data, selected }: NodeProps<Node<ClassNodeData>>) {
+  return (
+    <div
+      className={cn(
+        'rounded-lg border bg-card px-3 py-2 shadow-sm transition-shadow',
+        selected && 'ring-2 ring-primary shadow-md'
+      )}
+      style={{ borderLeftWidth: 4, borderLeftColor: data.colour }}
+    >
+      <Handle type="target" position={Position.Top} className="!bg-muted-foreground !w-2 !h-2" />
+      <p className="text-xs font-semibold text-foreground truncate max-w-[140px]">
+        {data.label}
+      </p>
+      <p className="text-[10px] text-muted-foreground">
+        {data.classType} · {data.methodCount}m · {data.repo}
+      </p>
+      <Handle type="source" position={Position.Bottom} className="!bg-muted-foreground !w-2 !h-2" />
+    </div>
+  )
+}
+
+const nodeTypes = { classNode: ClassNode }
+
+// ── Simple grid layout (rows per repo) ───────────────────────────────
+
+function layoutNodes(
+  raw: GraphNodeResponse[],
+  repoIndex: Map<string, number>
+): Node<ClassNodeData>[] {
+  const groups = new Map<string, GraphNodeResponse[]>()
+  for (const n of raw) {
+    const list = groups.get(n.repoName) ?? []
+    list.push(n)
+    groups.set(n.repoName, list)
+  }
+
+  const result: Node<ClassNodeData>[] = []
+  let yOffset = 0
+  const COL_WIDTH = 220
+  const ROW_HEIGHT = 80
+
+  for (const [repo, members] of groups) {
+    members.forEach((n, i) => {
+      const cols = Math.max(4, Math.ceil(Math.sqrt(members.length)))
+      result.push({
+        id: n.fqn,
+        type: 'classNode',
+        position: {
+          x: (i % cols) * COL_WIDTH,
+          y: yOffset + Math.floor(i / cols) * ROW_HEIGHT,
+        },
+        data: {
+          label: n.simpleName,
+          repo,
+          colour: repoColour(repo, repoIndex),
+          methodCount: n.methodCount,
+          classType: n.classType,
+        },
+      })
+    })
+    const cols = Math.max(4, Math.ceil(Math.sqrt(members.length)))
+    yOffset += (Math.ceil(members.length / cols) + 1) * ROW_HEIGHT
+  }
+  return result
+}
+
+// ── Props ────────────────────────────────────────────────────────────
+
 interface Props {
   nodes: GraphNodeResponse[]
   edges: GraphEdgeResponse[]
   onNodeClick?: (node: GraphNodeResponse) => void
 }
 
-/**
- * Cytoscape.js canvas.
- * - Node size scales with methodCount (coupling proxy).
- * - Node colour is unique per repo.
- * - Cross-repo edges are highlighted in orange; same-repo edges in grey.
- * - Clicking a node fires {@link onNodeClick}.
- */
-export default function GraphCanvas({ nodes, edges, onNodeClick }: Props) {
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  const cyRef = useRef<cytoscape.Core | null>(null)
+export default function GraphCanvas({ nodes: rawNodes, edges: rawEdges, onNodeClick }: Props) {
   const [selected, setSelected] = useState<GraphNodeResponse | null>(null)
-  const repoIndex = new Map<string, number>()
+  const repoIndex = useMemo(() => new Map<string, number>(), [])
 
-  // Build a lookup from fqn → node for click handler
-  const nodeLookup = new Map(nodes.map((n) => [n.fqn, n]))
+  const nodeLookup = useMemo(
+    () => new Map(rawNodes.map((n) => [n.fqn, n])),
+    [rawNodes]
+  )
 
-  useEffect(() => {
-    if (!containerRef.current) return
+  const initialNodes = useMemo(
+    () => layoutNodes(rawNodes, repoIndex),
+    [rawNodes, repoIndex]
+  )
 
-    const cy: cytoscape.Core = cytoscape({
-      container: containerRef.current,
-      elements: [
-        ...nodes.map((n) => ({
-          data: {
-            id: n.fqn,
-            label: n.simpleName,
-            repo: n.repoName,
-            colour: repoColour(n.repoName, repoIndex),
-            size: Math.max(20, Math.min(60, 20 + n.methodCount * 2)),
-          },
-        })),
-        ...edges.map((e, i) => ({
-          data: {
-            id: `e-${i}`,
-            source: e.sourceFqn,
-            target: e.targetFqn,
-            crossRepo: e.isCrossRepo,
-          },
-        })),
-      ],
-      style: [
-        {
-          selector: 'node',
-          style: {
-            'background-color': 'data(colour)',
-            'label': 'data(label)',
-            'color': '#f1f5f9',
-            'font-size': '10px',
-            'text-valign': 'center' as const,
-            'text-halign': 'center' as const,
-            'text-wrap': 'ellipsis' as const,
-            'text-max-width': '80px',
-            'width': 'data(size)',
-            'height': 'data(size)',
-          },
+  const initialEdges: Edge[] = useMemo(
+    () =>
+      rawEdges.map((e, i) => ({
+        id: `e-${i}`,
+        source: e.sourceFqn,
+        target: e.targetFqn,
+        animated: e.isCrossRepo,
+        style: {
+          stroke: e.isCrossRepo ? '#f97316' : 'hsl(var(--muted-foreground))',
+          strokeWidth: e.isCrossRepo ? 2 : 1,
         },
-        {
-          selector: 'node:selected',
-          style: {
-            'border-width': 3,
-            'border-color': '#f8fafc',
-          },
-        },
-        {
-          selector: 'edge',
-          style: {
-            'line-color': '#475569',
-            'target-arrow-color': '#475569',
-            'target-arrow-shape': 'triangle' as const,
-            'curve-style': 'bezier' as const,
-            'width': 1,
-          },
-        },
-        {
-          selector: 'edge[?crossRepo]',
-          style: {
-            'line-color': '#f97316',
-            'target-arrow-color': '#f97316',
-            'width': 2,
-          },
-        },
-      ],
-      layout: {
-        name: 'cose-bilkent',
-        animate: false,
-        nodeDimensionsIncludeLabels: true,
-      } as cytoscape.LayoutOptions,
-      wheelSensitivity: 0.3,
-    })
+        markerEnd: { type: 'arrowclosed' as const },
+      })),
+    [rawEdges]
+  )
 
-    cy.on('tap', 'node', (evt: cytoscape.EventObject) => {
-      const fqn: string = evt.target.id()
-      const node = nodeLookup.get(fqn) ?? null
-      setSelected(node)
-      onNodeClick?.(node!)
-    })
+  const [flowNodes, , onNodesChange] = useNodesState(initialNodes)
+  const [flowEdges, , onEdgesChange] = useEdgesState(initialEdges)
 
-    cyRef.current = cy
-    return () => cy.destroy()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nodes, edges])
+  const handleNodeClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      const gn = nodeLookup.get(node.id) ?? null
+      setSelected(gn)
+      if (gn) onNodeClick?.(gn)
+    },
+    [nodeLookup, onNodeClick]
+  )
 
   return (
-    <div className="relative flex h-full w-full">
-      {/* Canvas */}
-      <div ref={containerRef} className="flex-1 bg-gray-950" />
+    <div style={{ width: '100%', height: '100%' }} className="relative flex">
+      <ReactFlow
+        nodes={flowNodes}
+        edges={flowEdges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        nodeTypes={nodeTypes}
+        onNodeClick={handleNodeClick}
+        fitView
+        minZoom={0.1}
+        maxZoom={2}
+        style={{ flex: 1 }}
+      >
+        <Background gap={20} size={1} />
+        <Controls className="!bg-card !border-border !shadow-sm [&>button]:!bg-card [&>button]:!border-border [&>button]:!text-foreground" />
+        <MiniMap
+          nodeColor={(n) => (n.data as ClassNodeData)?.colour ?? '#94a3b8'}
+          className="!bg-card !border-border"
+        />
+      </ReactFlow>
 
-      {/* Side panel */}
       {selected && (
-        <aside className="w-72 shrink-0 overflow-y-auto border-l border-gray-700 bg-gray-900 p-4 text-sm">
-          <button
-            className="mb-3 text-xs text-gray-400 hover:text-white"
+        <aside className="w-72 shrink-0 overflow-y-auto border-l bg-card p-4 text-sm">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="mb-3 h-6 w-6"
             onClick={() => setSelected(null)}
           >
-            ✕ Close
-          </button>
-          <h2 className="mb-1 text-base font-bold">{selected.simpleName}</h2>
-          <p className="mb-3 break-all text-xs text-gray-400">{selected.fqn}</p>
-          <dl className="space-y-1">
-            {[
+            <X className="h-4 w-4" />
+          </Button>
+          <h2 className="mb-1 text-base font-bold text-foreground">{selected.simpleName}</h2>
+          <p className="mb-3 break-all text-xs text-muted-foreground">{selected.fqn}</p>
+          <dl className="space-y-1.5">
+            {([
               ['Type', selected.classType],
               ['Repo', selected.repoName],
               ['Package', selected.packageName],
               ['Abstract', selected.isAbstract ? 'yes' : 'no'],
               ['Methods', String(selected.methodCount)],
-            ].map(([k, v]) => (
+            ] as const).map(([k, v]) => (
               <div key={k} className="flex justify-between">
-                <dt className="text-gray-400">{k}</dt>
-                <dd className="font-medium">{v}</dd>
+                <dt className="text-muted-foreground">{k}</dt>
+                <dd className="font-medium text-foreground">{v}</dd>
               </div>
             ))}
           </dl>

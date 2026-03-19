@@ -15,17 +15,19 @@ public final class SyncJobResponse {
     private final int progressPercent;
     private final String currentRepo;
     private final List<String> errors;
+    private final List<String> warnings;
     private final Instant startedAt;
     private final Instant completedAt;
 
     public SyncJobResponse(String jobId, SyncStatus status, int progressPercent,
-                            String currentRepo, List<String> errors,
+                            String currentRepo, List<String> errors, List<String> warnings,
                             Instant startedAt, Instant completedAt) {
         this.jobId = jobId;
         this.status = status;
         this.progressPercent = progressPercent;
         this.currentRepo = currentRepo;
         this.errors = errors;
+        this.warnings = warnings;
         this.startedAt = startedAt;
         this.completedAt = completedAt;
     }
@@ -35,6 +37,7 @@ public final class SyncJobResponse {
     public int getProgressPercent() { return progressPercent; }
     public String getCurrentRepo() { return currentRepo; }
     public List<String> getErrors() { return errors; }
+    public List<String> getWarnings() { return warnings; }
     public Instant getStartedAt() { return startedAt; }
     public Instant getCompletedAt() { return completedAt; }
 

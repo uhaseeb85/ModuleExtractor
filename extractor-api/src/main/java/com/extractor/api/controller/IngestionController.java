@@ -202,6 +202,7 @@ public class IngestionController {
                 job.getProgressPercent(),
                 job.getCurrentRepo(),
                 new ArrayList<>(job.getErrors()),
+                new ArrayList<>(job.getWarnings()),
                 job.getStartedAt(),
                 job.getCompletedAt()
         );

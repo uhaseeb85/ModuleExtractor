@@ -54,6 +54,7 @@ export interface SyncJobResponse {
   progressPercent: number
   currentRepo: string | null
   errors: string[]
+  warnings: string[]
   startedAt: string | null
   completedAt: string | null
 }

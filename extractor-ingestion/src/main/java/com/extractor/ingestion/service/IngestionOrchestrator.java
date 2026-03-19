@@ -289,8 +289,8 @@ public class IngestionOrchestrator {
 
                     log.info("Resolved {} dependencies for '{}'", deps.size(), repo.getName());
                 } catch (Exception e) {
-                    log.error("Build parse failed for repo '{}': {}", repo.getName(), e.getMessage());
-                    job.addError("Build parse failed for " + repo.getName() + ": " + e.getMessage());
+                    log.warn("Build parse failed for repo '{}': {}", repo.getName(), e.getMessage());
+                    job.addWarning("Build parse failed for " + repo.getName() + ": " + e.getMessage());
                 }
             }
 

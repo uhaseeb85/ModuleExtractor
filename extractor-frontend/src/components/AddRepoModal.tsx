@@ -1,6 +1,25 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, AddRepoRequest } from '../api/client'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface Props {
   open: boolean
@@ -22,7 +41,6 @@ export default function AddRepoModal({ open, onClose }: Props) {
   const [syncNow, setSyncNow] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Auto-fill localPath from name unless user has manually edited it
   useEffect(() => {
     if (!localPathTouched) {
       setForm((f) => ({ ...f, localPath: f.name ? `/repos/${f.name}` : '' }))
@@ -44,8 +62,6 @@ export default function AddRepoModal({ open, onClose }: Props) {
     },
   })
 
-  if (!open) return null
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.name.trim() || !form.url.trim()) {
@@ -56,106 +72,115 @@ export default function AddRepoModal({ open, onClose }: Props) {
     mutation.mutate()
   }
 
-  const field = (
-    label: string,
-    key: keyof AddRepoRequest,
-    opts?: {
-      placeholder?: string
-      required?: boolean
-      onManualEdit?: () => void
-    }
-  ) => (
-    <div>
-      <label className="mb-1 block text-xs font-medium text-gray-300">
-        {label}
-        {opts?.required && <span className="ml-0.5 text-red-400">*</span>}
-      </label>
-      <input
-        type="text"
-        value={form[key] as string}
-        placeholder={opts?.placeholder}
-        onChange={(e) => {
-          opts?.onManualEdit?.()
-          setForm((f) => ({ ...f, [key]: e.target.value }))
-        }}
-        className="w-full rounded border border-gray-600 bg-gray-900 px-3 py-1.5 text-sm text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none"
-      />
-    </div>
-  )
+  const handleClose = () => {
+    setForm(EMPTY)
+    setLocalPathTouched(false)
+    setError(null)
+    onClose()
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-xl bg-gray-800 p-6 shadow-2xl">
-        <h2 className="mb-1 text-lg font-semibold">Add Repository</h2>
-        <p className="mb-5 text-xs text-gray-400">
-          Register a Git repository for analysis. Add multiple linked repos and
-          sync them together — cross-repo dependencies are tracked automatically.
-        </p>
+    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Add Repository</DialogTitle>
+          <DialogDescription>
+            Register a Git repository for analysis. Cross-repo dependencies are
+            tracked automatically.
+          </DialogDescription>
+        </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {field('Name', 'name', { placeholder: 'payments-service', required: true })}
-          {field('Git URL', 'url', {
-            placeholder: 'https://github.com/org/repo.git',
-            required: true,
-          })}
-          {field('Branch', 'branch', { placeholder: 'main' })}
-
-          <div>
-            <label className="mb-1 block text-xs font-medium text-gray-300">
-              Build Tool
-            </label>
-            <select
-              value={form.buildTool}
-              onChange={(e) => setForm((f) => ({ ...f, buildTool: e.target.value }))}
-              className="w-full rounded border border-gray-600 bg-gray-900 px-3 py-1.5 text-sm text-white focus:border-indigo-500 focus:outline-none"
-            >
-              <option value="MAVEN">Maven</option>
-              <option value="GRADLE">Gradle</option>
-            </select>
+          <div className="space-y-1.5">
+            <Label htmlFor="repo-name">
+              Name <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="repo-name"
+              value={form.name}
+              placeholder="payments-service"
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            />
           </div>
 
-          {field('Local Path (in container)', 'localPath', {
-            placeholder: '/repos/payments-service',
-            onManualEdit: () => setLocalPathTouched(true),
-          })}
-
-          <label className="flex items-center gap-2 text-sm text-gray-300">
-            <input
-              type="checkbox"
-              checked={syncNow}
-              onChange={(e) => setSyncNow(e.target.checked)}
-              className="rounded accent-indigo-500"
+          <div className="space-y-1.5">
+            <Label htmlFor="repo-url">
+              Git URL <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="repo-url"
+              value={form.url}
+              placeholder="https://github.com/org/repo.git"
+              onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
             />
-            Start ingestion immediately after adding
-          </label>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="repo-branch">Branch</Label>
+            <Input
+              id="repo-branch"
+              value={form.branch}
+              placeholder="main"
+              onChange={(e) => setForm((f) => ({ ...f, branch: e.target.value }))}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Build Tool</Label>
+            <Select
+              value={form.buildTool}
+              onValueChange={(v) => setForm((f) => ({ ...f, buildTool: v }))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="MAVEN">Maven</SelectItem>
+                <SelectItem value="GRADLE">Gradle</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="repo-path">Local Path (in container)</Label>
+            <Input
+              id="repo-path"
+              value={form.localPath}
+              placeholder="/repos/payments-service"
+              onChange={(e) => {
+                setLocalPathTouched(true)
+                setForm((f) => ({ ...f, localPath: e.target.value }))
+              }}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="sync-now"
+              checked={syncNow}
+              onCheckedChange={(v) => setSyncNow(v === true)}
+            />
+            <Label htmlFor="sync-now" className="text-sm font-normal">
+              Start ingestion immediately after adding
+            </Label>
+          </div>
 
           {error && (
-            <p className="rounded bg-red-900/40 px-3 py-2 text-xs text-red-300">{error}</p>
+            <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              {error}
+            </p>
           )}
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => {
-                setForm(EMPTY)
-                setLocalPathTouched(false)
-                setError(null)
-                onClose()
-              }}
-              className="rounded px-4 py-1.5 text-sm text-gray-400 hover:text-white"
-            >
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={mutation.isPending}
-              className="rounded bg-indigo-600 px-4 py-1.5 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-60"
-            >
+            </Button>
+            <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending ? 'Adding…' : 'Add Repository'}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

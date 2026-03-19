@@ -71,12 +71,16 @@ public class MavenBuildParserImpl implements BuildFileParser {
                     "-DincludeScope=compile",
                     "-DoutputAbsoluteArtifactFilename=true",
                     "-DoutputFile=" + outputFile.toAbsolutePath(),
-                    "-DappendOutput=false",
-                    "-q"
+                    "-DappendOutput=false"
             ));
             request.setBatchMode(true);
 
+            // Capture Maven stdout and stderr so failures are diagnosable
+            StringBuilder mavenOutput = new StringBuilder();
+
             Invoker invoker = new DefaultInvoker();
+            invoker.setOutputHandler(line -> mavenOutput.append(line).append('\n'));
+            invoker.setErrorHandler(line -> mavenOutput.append("[ERR] ").append(line).append('\n'));
             // Allow Maven home to be configured via env or use default PATH resolution
             String mavenHome = System.getenv("MAVEN_HOME");
             if (mavenHome != null && !mavenHome.trim().isEmpty()) {
@@ -85,9 +89,12 @@ public class MavenBuildParserImpl implements BuildFileParser {
 
             InvocationResult result = invoker.execute(request);
             if (result.getExitCode() != 0) {
+                String detail = mavenOutput.length() > 0
+                        ? mavenOutput.substring(0, Math.min(mavenOutput.length(), 2000))
+                        : "no output captured";
                 throw new BuildParseException(
                         "Maven dependency:list failed with exit code " + result.getExitCode()
-                                + " for project: " + projectDir,
+                                + " for project: " + projectDir + ". Maven output: " + detail,
                         BuildTool.MAVEN, projectDir);
             }
 

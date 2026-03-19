@@ -1,5 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../api/client'
+import { GitFork, Box, AlertTriangle, Share2 } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import SectionHeader from '@/components/SectionHeader'
+
+const STAT_ICONS = [GitFork, Box, Share2, AlertTriangle] as const
 
 export default function Dashboard() {
   const { data: repos, isLoading } = useQuery({
@@ -14,72 +28,98 @@ export default function Dashboard() {
 
   const totalNodes = repos?.reduce((s, r) => s + r.nodeCount, 0) ?? 0
 
-  return (
-    <div className="p-6">
-      <h1 className="mb-6 text-2xl font-bold">Dashboard</h1>
+  const stats = [
+    { label: 'Repositories', value: repos?.length ?? '—' },
+    { label: 'Total Nodes', value: totalNodes || '—' },
+    { label: 'Shared Entities', value: sharedEntities?.length ?? '—' },
+    { label: 'Cross-Repo Risks', value: sharedEntities?.length ?? '—' },
+  ]
 
-      {/* Summary cards */}
-      <div className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        {[
-          ['Repositories', String(repos?.length ?? '…')],
-          ['Total Nodes', String(totalNodes || '…')],
-          ['Shared Entities', String(sharedEntities?.length ?? '…')],
-          ['Cross-Repo Risks', String(sharedEntities?.length ?? '…')],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-lg bg-gray-800 p-5">
-            <div className="text-3xl font-bold">{value}</div>
-            <div className="mt-1 text-sm text-gray-400">{label}</div>
-          </div>
-        ))}
+  return (
+    <div className="space-y-8 p-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Overview of your registered repositories and dependency analysis
+        </p>
+      </div>
+
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {stats.map((s, i) => {
+          const Icon = STAT_ICONS[i]
+          return (
+            <Card key={s.label}>
+              <CardContent className="flex items-center gap-4 p-5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-2xl font-bold text-foreground">{s.value}</p>
+                  <p className="text-xs text-muted-foreground">{s.label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
 
       {/* Repo table */}
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Repositories</h2>
+        <SectionHeader>Repositories</SectionHeader>
         {isLoading ? (
-          <p className="text-gray-400">Loading…</p>
+          <p className="text-sm text-muted-foreground">Loading…</p>
         ) : (
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-700 text-gray-400">
-                <th className="pb-2 pr-4">Name</th>
-                <th className="pb-2 pr-4">Build</th>
-                <th className="pb-2 pr-4">Branch</th>
-                <th className="pb-2 pr-4">Nodes</th>
-                <th className="pb-2 pr-4">Last Sync</th>
-              </tr>
-            </thead>
-            <tbody>
-              {repos?.map((r) => (
-                <tr key={r.name} className="border-b border-gray-800 hover:bg-gray-800">
-                  <td className="py-2 pr-4 font-medium">{r.name}</td>
-                  <td className="py-2 pr-4 text-gray-300">{r.buildTool}</td>
-                  <td className="py-2 pr-4 text-gray-300">{r.branch}</td>
-                  <td className="py-2 pr-4">{r.nodeCount}</td>
-                  <td className="py-2 pr-4 text-gray-400">
-                    {r.syncedAt ? new Date(r.syncedAt).toLocaleString() : 'Never'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Build</TableHead>
+                  <TableHead>Branch</TableHead>
+                  <TableHead className="text-right">Nodes</TableHead>
+                  <TableHead>Last Sync</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {repos?.map((r) => (
+                  <TableRow key={r.name}>
+                    <TableCell className="font-medium">{r.name}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{r.buildTool}</Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{r.branch}</TableCell>
+                    <TableCell className="text-right">{r.nodeCount}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {r.syncedAt ? new Date(r.syncedAt).toLocaleString() : 'Never'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
         )}
       </section>
 
       {/* Shared entities warning */}
       {sharedEntities && sharedEntities.length > 0 && (
-        <section className="mt-8">
-          <h2 className="mb-3 text-lg font-semibold text-orange-400">
-            ⚠ Shared Entities ({sharedEntities.length})
-          </h2>
-          <ul className="space-y-1 text-sm">
+        <section>
+          <SectionHeader>
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-amber-500" />
+              Shared Entities ({sharedEntities.length})
+            </span>
+          </SectionHeader>
+          <div className="space-y-1.5">
             {sharedEntities.map((e) => (
-              <li key={e.fqn} className="rounded bg-gray-800 px-3 py-2">
-                <span className="font-medium">{e.simpleName}</span>
-                <span className="ml-2 text-gray-400">{e.fqn}</span>
-              </li>
+              <Card key={e.fqn}>
+                <CardContent className="flex items-center gap-3 px-4 py-3">
+                  <span className="font-medium text-foreground">{e.simpleName}</span>
+                  <span className="text-xs text-muted-foreground">{e.fqn}</span>
+                </CardContent>
+              </Card>
             ))}
-          </ul>
+          </div>
         </section>
       )}
     </div>

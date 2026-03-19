@@ -17,6 +17,7 @@ public class SyncJobStatus {
     private volatile int progressPercent;
     private volatile String currentRepo;
     private final List<String> errors = new ArrayList<>();
+    private final List<String> warnings = new ArrayList<>();
     private final Instant startedAt;
     private volatile Instant completedAt;
 
@@ -36,6 +37,8 @@ public class SyncJobStatus {
     public void setCurrentRepo(String currentRepo) { this.currentRepo = currentRepo; }
     public List<String> getErrors() { return errors; }
     public void addError(String error) { this.errors.add(error); }
+    public List<String> getWarnings() { return warnings; }
+    public void addWarning(String warning) { this.warnings.add(warning); }
     public Instant getStartedAt() { return startedAt; }
     public Instant getCompletedAt() { return completedAt; }
     public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }

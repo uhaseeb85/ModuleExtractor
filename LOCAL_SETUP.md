@@ -23,19 +23,19 @@ This application has **no external infrastructure requirements** — no database
 
 Install the following tools before starting. **All three are required.**
 
-### Java 17 or higher
+### Java 8 or higher
 
-The backend is a Spring Boot 2.7.x application that requires Java 17+.
+The backend is a Spring Boot 2.7.x application compiled to Java 8 bytecode — it runs on any JDK from 8 onwards (Java 8, 11, 17, 21 all work).
 
 **Windows — download and install:**
 - Go to https://adoptium.net/temurin/releases/
-- Download the **JDK 21** (or 17) MSI installer for Windows x64
+- Download any **JDK 8, 11, 17, or 21** MSI installer for Windows x64 (JDK 21 LTS is recommended)
 - Run the installer and follow the prompts (it sets `JAVA_HOME` and `PATH` automatically)
 
 **Verify installation:**
 ```powershell
 java -version
-# Expected output: openjdk version "21.x.x" ...
+# Expected output: openjdk version "1.8.x" ... (or 11 / 17 / 21)
 ```
 
 > **Note:** If `java -version` still shows an old version after installing, open a **new** PowerShell/terminal window to pick up the updated `PATH`.
@@ -58,7 +58,7 @@ Maven builds all six backend modules and is also used at **runtime** by the inge
 **Verify installation:**
 ```powershell
 mvn -version
-# Expected output: Apache Maven 3.9.x ...  Java version: 21.x.x
+# Expected output: Apache Maven 3.9.x ...  Java version: 1.8.x (or 11 / 17 / 21)
 ```
 
 > **Important:** Maven must also be available at runtime (not just build-time), because the ingestion module uses the Maven Invoker API to parse `pom.xml` dependency trees of the repositories you scan.
@@ -331,6 +331,9 @@ Invoke-WebRequest -Uri http://localhost:8081/api/v1/ingestion/jobs/{jobId} | Sel
 | `POST` | `/api/v1/ingestion/sync/{repoName}` | Trigger single-repo sync |
 | `GET` | `/api/v1/ingestion/jobs/{jobId}` | Poll job status |
 | `GET` | `/api/v1/ingestion/repos` | List configured repos |
+| `POST` | `/api/v1/ingestion/repos` | Register a new repo at runtime (`?sync=true` to also trigger ingestion) |
+| `DELETE` | `/api/v1/ingestion/repos/{name}` | Remove a repo from the runtime list |
+| `POST` | `/api/v1/ingestion/scan-directory` | Scan a local directory for Git repos and register them all (`?sync=true`) |
 
 #### Graph
 
@@ -372,7 +375,7 @@ mvn test -pl extractor-analysis
 java -version
 mvn -version
 ```
-Both must show Java 17 or higher. If `mvn -version` shows an older Java, Maven is picking up the wrong JDK. Set `JAVA_HOME` explicitly:
+Both must show Java 8 or higher. If `mvn -version` shows an older Java, Maven is picking up the wrong JDK. Set `JAVA_HOME` explicitly:
 ```powershell
 $env:JAVA_HOME = "C:\Program Files\Eclipse Adoptium\jdk-21.x.x.x-hotspot"
 mvn clean package -DskipTests

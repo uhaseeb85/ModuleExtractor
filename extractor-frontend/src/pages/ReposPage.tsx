@@ -1,14 +1,19 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, SyncJobResponse } from '../api/client'
+import { Plus, FolderOpen, RefreshCw, Trash2 } from 'lucide-react'
 import AddRepoModal from '../components/AddRepoModal'
 import ScanDirectoryModal from '../components/ScanDirectoryModal'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Progress } from '@/components/ui/progress'
+import { cn } from '@/lib/utils'
 
 export default function ReposPage() {
   const queryClient = useQueryClient()
   const [showAddModal, setShowAddModal] = useState(false)
   const [showScanModal, setShowScanModal] = useState(false)
-  // repoName → latest job response
   const [jobs, setJobs] = useState<Record<string, SyncJobResponse>>({})
 
   const { data: repos = [], isLoading } = useQuery({
@@ -21,7 +26,6 @@ export default function ReposPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['repos'] }),
   })
 
-  // Poll active jobs every 1.5 s
   const pollJobs = useCallback(async () => {
     const running = Object.entries(jobs).filter(
       ([, j]) => j.status === 'RUNNING' || j.status === 'PENDING'
@@ -59,9 +63,7 @@ export default function ReposPage() {
   const startSyncAll = async () => {
     try {
       const job = await api.triggerFullSync()
-      // pin the full-sync job under a special key and also under each repo
-      const allKey = '__all__'
-      setJobs((prev) => ({ ...prev, [allKey]: job }))
+      setJobs((prev) => ({ ...prev, ['__all__']: job }))
     } catch (err) {
       alert(`Failed to start sync: ${(err as Error).message}`)
     }
@@ -70,55 +72,60 @@ export default function ReposPage() {
   const jobFor = (name: string) => jobs[name] ?? jobs['__all__'] ?? null
 
   return (
-    <div className="p-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Repositories</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Repositories</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage registered repositories and trigger sync operations
+          </p>
+        </div>
         <div className="flex gap-2">
           {repos.length > 0 && (
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={startSyncAll}
               disabled={jobs['__all__']?.status === 'RUNNING'}
-              className="rounded bg-gray-700 px-3 py-1.5 text-xs font-semibold hover:bg-gray-600 disabled:opacity-60"
+              className="gap-1.5"
             >
+              <RefreshCw className={cn('h-3.5 w-3.5', jobs['__all__']?.status === 'RUNNING' && 'animate-spin')} />
               {jobs['__all__']?.status === 'RUNNING'
                 ? `Syncing all… ${jobs['__all__'].progressPercent}%`
                 : 'Sync All'}
-            </button>
+            </Button>
           )}
-          <button
-            onClick={() => setShowScanModal(true)}
-            className="rounded bg-gray-700 px-3 py-1.5 text-xs font-semibold hover:bg-gray-600"
-          >
-            📂 Scan Local Directory
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="rounded bg-indigo-600 px-3 py-1.5 text-xs font-semibold hover:bg-indigo-500"
-          >
-            + Add Repository
-          </button>
+          <Button variant="outline" size="sm" onClick={() => setShowScanModal(true)} className="gap-1.5">
+            <FolderOpen className="h-3.5 w-3.5" />
+            Scan Directory
+          </Button>
+          <Button size="sm" onClick={() => setShowAddModal(true)} className="gap-1.5">
+            <Plus className="h-3.5 w-3.5" />
+            Add Repository
+          </Button>
         </div>
       </div>
 
       {/* Multi-repo hint */}
       {repos.length > 1 && (
-        <p className="mb-4 rounded bg-indigo-900/30 px-4 py-2 text-xs text-indigo-300">
-          {repos.length} repositories configured — cross-repo dependencies are linked automatically during sync.
-        </p>
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="px-4 py-2.5 text-xs text-primary">
+            {repos.length} repositories configured — cross-repo dependencies are linked
+            automatically during sync.
+          </CardContent>
+        </Card>
       )}
 
       {isLoading ? (
-        <p className="text-gray-400">Loading…</p>
+        <p className="text-sm text-muted-foreground">Loading…</p>
       ) : repos.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-600 py-16 text-center">
-          <p className="mb-2 text-gray-400">No repositories registered yet.</p>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="mt-2 rounded bg-indigo-600 px-4 py-2 text-sm font-semibold hover:bg-indigo-500"
-          >
+        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
+          <p className="mb-2 text-muted-foreground">No repositories registered yet.</p>
+          <Button onClick={() => setShowAddModal(true)} className="mt-2 gap-1.5">
+            <Plus className="h-4 w-4" />
             Add Your First Repository
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -128,74 +135,76 @@ export default function ReposPage() {
             const isFailed = job?.status === 'FAILED'
             const isDone = job?.status === 'COMPLETED'
             return (
-              <div key={r.name} className="rounded-lg bg-gray-800 p-5">
-                <div className="mb-2 flex items-center justify-between">
-                  <h2 className="font-semibold">{r.name}</h2>
-                  <span className="rounded bg-gray-700 px-2 py-0.5 text-xs">
-                    {r.buildTool}
-                  </span>
-                </div>
-                <p className="mb-1 break-all text-xs text-gray-400">{r.url}</p>
-                <p className="mb-3 text-xs text-gray-500">
-                  Branch: {r.branch} · {r.nodeCount} nodes
-                </p>
-                <p className="mb-3 text-xs text-gray-500">
-                  Last sync:{' '}
-                  {r.syncedAt ? new Date(r.syncedAt).toLocaleString() : 'Never'}
-                </p>
-
-                {/* Job status strip */}
-                {job && (
-                  <div className="mb-3">
-                    {isRunning && (
-                      <>
-                        <div className="mb-1 flex items-center justify-between text-xs text-indigo-300">
-                          <span>
-                            Syncing{job.currentRepo ? ` ${job.currentRepo}` : ''}…
-                          </span>
-                          <span>{job.progressPercent}%</span>
-                        </div>
-                        <div className="h-1.5 w-full rounded bg-gray-700">
-                          <div
-                            className="h-1.5 rounded bg-indigo-500 transition-all duration-500"
-                            style={{ width: `${Math.max(job.progressPercent, 4)}%` }}
-                          />
-                        </div>
-                      </>
-                    )}
-                    {isDone && (
-                      <p className="text-xs text-emerald-400">✓ Sync completed</p>
-                    )}
-                    {isFailed && (
-                      <p className="text-xs text-red-400">
-                        ✗ Sync failed
-                        {job.errors[0] ? `: ${job.errors[0]}` : ''}
-                      </p>
-                    )}
+              <Card key={r.name} className="overflow-hidden">
+                <CardContent className="p-5">
+                  <div className="mb-2 flex items-center justify-between">
+                    <h2 className="font-semibold text-foreground">{r.name}</h2>
+                    <Badge variant="secondary">{r.buildTool}</Badge>
                   </div>
-                )}
+                  <p className="mb-1 break-all text-xs text-muted-foreground">{r.url}</p>
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    Branch: {r.branch} · {r.nodeCount} nodes
+                  </p>
+                  <p className="mb-3 text-xs text-muted-foreground">
+                    Last sync:{' '}
+                    {r.syncedAt ? new Date(r.syncedAt).toLocaleString() : 'Never'}
+                  </p>
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => startSync(r.name)}
-                    disabled={isRunning}
-                    className="rounded bg-indigo-600 px-3 py-1 text-xs font-semibold hover:bg-indigo-500 disabled:opacity-60"
-                  >
-                    {isRunning ? 'Syncing…' : 'Sync'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (confirm(`Remove "${r.name}" from analysis? (cloned files are kept)`)) {
-                        removeMutation.mutate(r.name)
-                      }
-                    }}
-                    disabled={removeMutation.isPending}
-                    className="rounded border border-red-700 px-3 py-1 text-xs text-red-400 hover:bg-red-900/40 disabled:opacity-60"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
+                  {/* Job status */}
+                  {job && (
+                    <div className="mb-3">
+                      {isRunning && (
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-xs text-primary">
+                            <span>
+                              Syncing{job.currentRepo ? ` ${job.currentRepo}` : ''}…
+                            </span>
+                            <span>{job.progressPercent}%</span>
+                          </div>
+                          <Progress value={job.progressPercent} />
+                        </div>
+                      )}
+                      {isDone && (
+                        <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                          ✓ Sync completed
+                        </p>
+                      )}
+                      {isFailed && (
+                        <p className="text-xs text-destructive">
+                          ✗ Sync failed
+                          {job.errors[0] ? `: ${job.errors[0]}` : ''}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => startSync(r.name)}
+                      disabled={isRunning}
+                      className="gap-1.5"
+                    >
+                      <RefreshCw className={cn('h-3 w-3', isRunning && 'animate-spin')} />
+                      {isRunning ? 'Syncing…' : 'Sync'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm(`Remove "${r.name}" from analysis? (cloned files are kept)`)) {
+                          removeMutation.mutate(r.name)
+                        }
+                      }}
+                      disabled={removeMutation.isPending}
+                      className="gap-1.5 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Remove
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             )
           })}
         </div>
