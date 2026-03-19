@@ -12,6 +12,9 @@ import com.extractor.core.model.RepoConfig;
 import com.extractor.ingestion.config.ExtractorProperties;
 import com.extractor.ingestion.model.SyncJobStatus;
 import com.extractor.ingestion.parser.JavaSourceParserImpl;
+import com.extractor.ingestion.parser.SpringXmlContextParser;
+import com.extractor.graph.entity.SpringXmlConfigEntity;
+import com.extractor.graph.store.GraphStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -55,6 +58,8 @@ public class IngestionOrchestrator {
     private final List<BuildFileParser> buildFileParsers;
     private final GraphBuilder graphBuilder;
     private final ExtractorProperties properties;
+    private final SpringXmlContextParser springXmlParser;
+    private final GraphStore graphStore;
 
     private final Map<String, SyncJobStatus> jobs = new ConcurrentHashMap<>();
 
@@ -65,12 +70,16 @@ public class IngestionOrchestrator {
                                  JavaSourceParserImpl javaSourceParser,
                                  List<BuildFileParser> buildFileParsers,
                                  GraphBuilder graphBuilder,
-                                 ExtractorProperties properties) {
+                                 ExtractorProperties properties,
+                                 SpringXmlContextParser springXmlParser,
+                                 GraphStore graphStore) {
         this.repoScanner = repoScanner;
         this.javaSourceParser = javaSourceParser;
         this.buildFileParsers = buildFileParsers;
         this.graphBuilder = graphBuilder;
         this.properties = properties;
+        this.springXmlParser = springXmlParser;
+        this.graphStore = graphStore;
         this.configuredRepos.addAll(properties.toRepoConfigs());
     }
 
@@ -325,6 +334,20 @@ public class IngestionOrchestrator {
 
                 done++;
                 job.setProgressPercent((done * 100) / total);
+            }
+
+            // Phase 4: Parse Spring XML context files
+            for (RepoConfig repo : repos) {
+                try {
+                    Path repoRoot = Paths.get(repo.getLocalPath());
+                    List<SpringXmlConfigEntity> configs = springXmlParser.parseRepo(repoRoot, repo.getName());
+                    for (SpringXmlConfigEntity cfg : configs) {
+                        graphStore.putSpringXmlConfig(cfg);
+                    }
+                } catch (Exception e) {
+                    log.warn("Spring XML parsing failed for repo '{}': {}", repo.getName(), e.getMessage());
+                    job.addWarning("Spring XML parse failed for " + repo.getName() + ": " + e.getMessage());
+                }
             }
 
             job.setStatus(job.getErrors().isEmpty() ? SyncStatus.COMPLETED : SyncStatus.FAILED);

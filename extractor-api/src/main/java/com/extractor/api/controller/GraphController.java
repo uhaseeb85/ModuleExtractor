@@ -4,6 +4,8 @@ import com.extractor.api.dto.GraphEdgeResponse;
 import com.extractor.api.dto.GraphNodeResponse;
 import com.extractor.graph.entity.ClassEntity;
 import com.extractor.graph.repository.ClassEntityRepository;
+import com.extractor.graph.store.GraphStore;
+import org.jgrapht.graph.DefaultEdge;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -25,9 +28,11 @@ import java.util.stream.Collectors;
 public class GraphController {
 
     private final ClassEntityRepository classRepository;
+    private final GraphStore store;
 
-    public GraphController(ClassEntityRepository classRepository) {
+    public GraphController(ClassEntityRepository classRepository, GraphStore store) {
         this.classRepository = classRepository;
+        this.store = store;
     }
 
     /**
@@ -83,21 +88,37 @@ public class GraphController {
             @RequestParam(required = false) String repo,
             @RequestParam(defaultValue = "false") boolean crossRepoOnly) {
 
+        // Build a lookup of FQN → entity for quick access
         List<ClassEntity> classes = repo != null && !repo.trim().isEmpty()
                 ? classRepository.findByRepoName(repo)
                 : classRepository.findAll();
 
+        java.util.Map<String, ClassEntity> byFqn = classes.stream()
+                .collect(Collectors.toMap(ClassEntity::getFullyQualifiedName, c -> c, (a, b) -> a));
+
+        Set<String> scopedFqns = byFqn.keySet();
+
         List<GraphEdgeResponse> edges = new ArrayList<>();
 
-        for (ClassEntity source : classes) {
-            for (ClassEntity target : source.getImports()) {
-                boolean isCrossRepo = !source.getRepoName().equals(target.getRepoName());
-                if (crossRepoOnly && !isCrossRepo) continue;
-                edges.add(new GraphEdgeResponse(
-                        source.getId(), source.getFullyQualifiedName(),
-                        target.getId(), target.getFullyQualifiedName(),
-                        "IMPORTS", isCrossRepo));
-            }
+        // Iterate over the JGraphT importGraph — the authoritative edge store
+        for (DefaultEdge e : store.importGraph().edgeSet()) {
+            String sourceFqn = store.importGraph().getEdgeSource(e);
+            String targetFqn = store.importGraph().getEdgeTarget(e);
+
+            // At least one end must be in the scoped set
+            if (!scopedFqns.contains(sourceFqn) && !scopedFqns.contains(targetFqn)) continue;
+
+            ClassEntity source = byFqn.get(sourceFqn);
+            ClassEntity target = byFqn.get(targetFqn);
+
+            boolean isCrossRepo = source != null && target != null
+                    && !source.getRepoName().equals(target.getRepoName());
+            if (crossRepoOnly && !isCrossRepo) continue;
+
+            edges.add(new GraphEdgeResponse(
+                    source != null ? source.getId() : null, sourceFqn,
+                    target != null ? target.getId() : null, targetFqn,
+                    "IMPORTS", isCrossRepo));
         }
         return edges;
     }

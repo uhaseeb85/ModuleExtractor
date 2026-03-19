@@ -20,6 +20,8 @@ public class ClassEntity {
     private String packageName;
     private int lineNumber;
     private String javadoc;
+    /** Absolute path to the original .java source file on disk. */
+    private String sourceFilePath;
 
     // ── Relationships (in-memory lists) ────────────────────────────────
 
@@ -59,6 +61,8 @@ public class ClassEntity {
     public int getLineNumber() { return lineNumber; }
     public String getJavadoc() { return javadoc; }
     public void setJavadoc(String javadoc) { this.javadoc = javadoc; }
+    public String getSourceFilePath() { return sourceFilePath; }
+    public void setSourceFilePath(String sourceFilePath) { this.sourceFilePath = sourceFilePath; }
     public List<MethodEntity> getMethods() { return methods; }
     public void setMethods(List<MethodEntity> methods) { this.methods = methods; }
     public List<FieldEntity> getFields() { return fields; }

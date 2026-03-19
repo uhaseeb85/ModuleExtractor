@@ -1,9 +1,8 @@
 import { BrowserRouter, Link, Route, Routes, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { LayoutDashboard, GitFork, FolderGit2, Puzzle, Sun, Moon, Boxes } from 'lucide-react'
+import { LayoutDashboard, FolderGit2, Puzzle, Sun, Moon, Boxes } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Dashboard from './pages/Dashboard'
-import GraphPage from './pages/GraphPage'
 import ReposPage from './pages/ReposPage'
 import CandidatesPage from './pages/CandidatesPage'
 import LandingPage from './pages/LandingPage'
@@ -11,7 +10,6 @@ import SyncStatusBadge from './components/SyncStatusBadge'
 
 const NAV_ITEMS = [
   { to: '/dashboard',  label: 'Dashboard',              icon: LayoutDashboard },
-  { to: '/graph',      label: 'Dependency Graph',       icon: GitFork         },
   { to: '/repos',      label: 'Repositories',           icon: FolderGit2      },
   { to: '/candidates', label: 'Module Recommendations', icon: Puzzle          },
 ]
@@ -78,7 +76,6 @@ function AppShell({ dark, toggleDark }: { dark: boolean; toggleDark: () => void 
       <main className="flex-1 min-h-0 overflow-hidden bg-background">
         <Routes>
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/graph"     element={<GraphPage />} />
           <Route path="/repos"     element={<ReposPage />} />
           <Route path="/candidates" element={<CandidatesPage />} />
         </Routes>

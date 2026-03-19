@@ -55,6 +55,11 @@ public class RepoScannerImpl implements RepoScanner {
 
         try {
             if (Files.exists(localPath.resolve(".git"))) {
+                // Local-only repo: url == localPath means there's no remote to pull from.
+                // Just return the current HEAD SHA without attempting a network operation.
+                if (isLocalOnly(config)) {
+                    return headSha(localPath);
+                }
                 return pull(config, localPath);
             } else {
                 return clone(config, localPath);
@@ -62,6 +67,28 @@ public class RepoScannerImpl implements RepoScanner {
         } catch (Exception e) {
             throw new IngestionException(
                     "Failed to sync repo '" + config.getName() + "' from " + config.getUrl(), e);
+        }
+    }
+
+    /**
+     * Returns true when the repo URL is a local filesystem path (no remote).
+     * This is the case for repos registered via the scan-directory feature.
+     */
+    private boolean isLocalOnly(RepoConfig config) {
+        String url = config.getUrl();
+        if (url == null || url.isBlank()) return true;
+        // Remote URLs start with a scheme (http/https/git/ssh) or user@host: format
+        return !url.contains("://") && !url.contains("@");
+    }
+
+    private String headSha(Path localPath) throws IOException {
+        try (Git git = Git.open(localPath.toFile())) {
+            org.eclipse.jgit.lib.ObjectId head = git.getRepository().resolve("HEAD");
+            if (head == null) {
+                log.warn("HEAD is null for local repo at '{}' — returning empty SHA", localPath);
+                return "";
+            }
+            return head.getName();
         }
     }
 

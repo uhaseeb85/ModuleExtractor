@@ -7,6 +7,8 @@ import com.extractor.core.interfaces.RepoScanner;
 import com.extractor.core.model.RepoConfig;
 import com.extractor.ingestion.config.ExtractorProperties;
 import com.extractor.ingestion.parser.JavaSourceParserImpl;
+import com.extractor.ingestion.parser.SpringXmlContextParser;
+import com.extractor.graph.store.GraphStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -47,7 +49,9 @@ class IngestionOrchestratorScanTest {
                 mock(JavaSourceParserImpl.class),
                 Arrays.asList(mock(BuildFileParser.class)),
                 mock(GraphBuilder.class),
-                props
+                props,
+                mock(SpringXmlContextParser.class),
+                mock(GraphStore.class)
         );
     }
 

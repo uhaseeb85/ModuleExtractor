@@ -187,7 +187,8 @@ public class JavaSourceParserImpl implements JavaSourceParser {
 
         ClassNode classNode = new ClassNode(fqn, primaryType.getNameAsString(), classType,
                 isAbstract, repo.getName(), javadoc, methods, fields, typeAnnotations, packageName,
-                primaryType.getBegin().map(p -> p.line).orElse(0));
+                primaryType.getBegin().map(p -> p.line).orElse(0),
+                javaFile.toAbsolutePath().toString());
 
         return new ParseResult(classNode, methods, fields, imports, calls, annotations);
     }

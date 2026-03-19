@@ -6,6 +6,7 @@ import com.extractor.graph.entity.FieldEntity;
 import com.extractor.graph.entity.MethodEntity;
 import com.extractor.graph.entity.PackageEntity;
 import com.extractor.graph.entity.RepositoryEntity;
+import com.extractor.graph.entity.SpringXmlConfigEntity;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
 import org.slf4j.Logger;
@@ -57,6 +58,9 @@ public class GraphStore {
     /** Fields grouped by owning class FQN. */
     private final Map<String, List<FieldEntity>> fieldsByClassFqn = new ConcurrentHashMap<>();
 
+    /** Spring XML config index. Key = filePath + "::" + repoName. */
+    private final Map<String, SpringXmlConfigEntity> springXmlByKey = new ConcurrentHashMap<>();
+
     // ── JGraphT IMPORTS graph ───────────────────────────────────────────
 
     /**
@@ -100,6 +104,16 @@ public class GraphStore {
 
     public void putField(String classFqn, FieldEntity field) {
         fieldsByClassFqn.computeIfAbsent(classFqn, k -> new ArrayList<>()).add(field);
+    }
+
+    public void putSpringXmlConfig(SpringXmlConfigEntity entity) {
+        springXmlByKey.put(entity.getFilePath() + "::" + entity.getRepoName(), entity);
+    }
+
+    public List<SpringXmlConfigEntity> springXmlConfigsByRepo(String repoName) {
+        return springXmlByKey.values().stream()
+                .filter(e -> repoName.equals(e.getRepoName()))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -227,6 +241,7 @@ public class GraphStore {
         packageByKey.entrySet().removeIf(e -> repoName.equals(e.getValue().getRepoName()));
         artifactByCoords.entrySet().removeIf(e -> repoName.equals(e.getValue().getRepoName()));
         methodByKey.entrySet().removeIf(e -> repoName.equals(e.getValue().getRepoName()));
+        springXmlByKey.entrySet().removeIf(e -> repoName.equals(e.getValue().getRepoName()));
         repoByName.remove(repoName);
 
         rebuildImportGraph();
@@ -241,6 +256,7 @@ public class GraphStore {
         methodByKey.clear();
         methodsByClassFqn.clear();
         fieldsByClassFqn.clear();
+        springXmlByKey.clear();
         importGraph = new DefaultDirectedGraph<>(DefaultEdge.class);
     }
 

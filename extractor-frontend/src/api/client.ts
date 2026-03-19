@@ -3,18 +3,27 @@ const BASE = '/api/v1'
 
 async function request<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`)
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText} (${path})`)
+  if (!res.ok) {
+    // Try to extract a structured error message from JSON response body
+    const body = await res.json().catch(() => null) as Record<string, string> | null
+    const detail = body?.detail ?? body?.error ?? `${res.status} ${res.statusText}`
+    throw new Error(detail)
+  }
   return res.json() as Promise<T>
 }
 
 async function send<T>(
   method: string,
   path: string,
-  body?: unknown
+  body?: unknown,
+  extraHeaders?: Record<string, string>,
 ): Promise<T> {
+  const headers: Record<string, string> = { ...(extraHeaders ?? {}) }
+  if (body) headers['Content-Type'] = 'application/json'
+
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: Object.keys(headers).length ? headers : undefined,
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {
@@ -112,6 +121,57 @@ export interface AddRepoRequest {
   localPath: string
 }
 
+// ── Scaffold types ────────────────────────────────────────────────────
+
+export interface ProjectTreeNodeResponse {
+  name: string
+  path: string
+  type: 'DIRECTORY' | 'FILE'
+  children: ProjectTreeNodeResponse[] | null
+  hasContent: boolean
+  sourceRef: string | null
+}
+
+export interface ScaffoldPreviewResponse {
+  moduleName: string
+  modulePackageRoot: string
+  repoName: string
+  tree: ProjectTreeNodeResponse
+  springContextFiles: string[]
+  totalFiles: number
+}
+
+export interface FileContentResponse {
+  filePath: string
+  content: string
+}
+
+// ── AI types ──────────────────────────────────────────────────────────
+
+export interface AiModelResponse {
+  id: string
+  name: string
+  description: string | null
+  contextLength: number
+  promptPrice: string | null
+  completionPrice: string | null
+}
+
+export interface AiAnalysisRequest {
+  model: string
+  moduleName?: string
+  groupDepth?: number
+  minScore?: number
+}
+
+export interface AiAnalysisResponse {
+  content: string | null
+  modelUsed: string | null
+  promptTokens: number
+  completionTokens: number
+  error: string | null
+}
+
 /** Payload for scanning a local directory for Git repositories. */
 export interface ScanDirectoryRequest {
   /** Absolute path to scan (may be a single repo or a directory of repos). */
@@ -194,6 +254,60 @@ export const api = {
     request<ModuleRecommendationResponse[]>(
       `/analysis/recommendations${toQuery({ groupDepth: String(groupDepth), minScore: String(minScore) })}`
     ),
+
+  // ── Scaffold ────────────────────────────────────────────────────────
+
+  getScaffoldPreview: (moduleName: string, modulePackageRoot: string, repoName: string, groupDepth = 4, minScore = 0.4) =>
+    request<ScaffoldPreviewResponse>(
+      `/scaffold/preview${toQuery({
+        moduleName,
+        modulePackageRoot,
+        repoName,
+        groupDepth: String(groupDepth),
+        minScore: String(minScore),
+      })}`
+    ),
+
+  getScaffoldFile: (moduleName: string, repoName: string, filePath: string) =>
+    request<FileContentResponse>(
+      `/scaffold/file${toQuery({ moduleName, repoName, filePath })}`
+    ),
+
+  exportScaffold: async (moduleName: string, modulePackageRoot: string, repoName: string, groupDepth = 4, minScore = 0.4) => {
+    const res = await fetch(`${BASE}/scaffold/export${toQuery({
+      moduleName,
+      modulePackageRoot,
+      repoName,
+      groupDepth: String(groupDepth),
+      minScore: String(minScore),
+    })}`, { method: 'POST' })
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+    return res.blob()
+  },
+
+  // ── AI ──────────────────────────────────────────────────────────────
+
+  getAiModels: (apiKey: string) => {
+    const res = fetch(`${BASE}/ai/models`, {
+      headers: { 'X-OpenRouter-Key': apiKey },
+    })
+    return res.then(r => {
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
+      return r.json() as Promise<AiModelResponse[]>
+    })
+  },
+
+  aiRefineBoundaries: (apiKey: string, body: AiAnalysisRequest) =>
+    send<AiAnalysisResponse>('POST', '/ai/refine-boundaries', body, { 'X-OpenRouter-Key': apiKey }),
+
+  aiMigrationPlan: (apiKey: string, body: AiAnalysisRequest) =>
+    send<AiAnalysisResponse>('POST', '/ai/migration-plan', body, { 'X-OpenRouter-Key': apiKey }),
+
+  aiBoundedContexts: (apiKey: string, body: AiAnalysisRequest) =>
+    send<AiAnalysisResponse>('POST', '/ai/bounded-contexts', body, { 'X-OpenRouter-Key': apiKey }),
+
+  aiOptimiseWeights: (apiKey: string, body: AiAnalysisRequest) =>
+    send<AiAnalysisResponse>('POST', '/ai/optimise-weights', body, { 'X-OpenRouter-Key': apiKey }),
 }
 
 function toQuery(params?: Record<string, string | boolean | undefined>): string {

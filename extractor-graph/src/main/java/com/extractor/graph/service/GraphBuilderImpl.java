@@ -138,6 +138,9 @@ public class GraphBuilderImpl implements GraphBuilder {
                         cn.getFqn(), cn.getSimpleName(), cn.getClassType(),
                         cn.isAbstract(), cn.getRepoName(), cn.getPackageName(), cn.getLineNumber()));
         cn.getJavadoc().ifPresent(classEntity::setJavadoc);
+        if (cn.getSourceFilePath() != null) {
+            classEntity.setSourceFilePath(cn.getSourceFilePath());
+        }
 
         // Ensure parent package exists
         store.findPackageByFqnAndRepo(cn.getPackageName(), cn.getRepoName())

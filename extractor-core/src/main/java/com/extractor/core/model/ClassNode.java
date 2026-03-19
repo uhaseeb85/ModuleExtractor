@@ -23,11 +23,21 @@ public final class ClassNode {
     private final List<String> annotations;
     private final String packageName;
     private final int lineNumber;
+    /** Absolute path to the original .java source file on disk (may be null). */
+    private final String sourceFilePath;
 
     public ClassNode(String fqn, String simpleName, ClassType classType, boolean isAbstract,
                      String repoName, Optional<String> javadoc,
                      List<MethodNode> methods, List<FieldNode> fields, List<String> annotations,
                      String packageName, int lineNumber) {
+        this(fqn, simpleName, classType, isAbstract, repoName, javadoc, methods, fields, annotations,
+                packageName, lineNumber, null);
+    }
+
+    public ClassNode(String fqn, String simpleName, ClassType classType, boolean isAbstract,
+                     String repoName, Optional<String> javadoc,
+                     List<MethodNode> methods, List<FieldNode> fields, List<String> annotations,
+                     String packageName, int lineNumber, String sourceFilePath) {
         this.fqn = fqn;
         this.simpleName = simpleName;
         this.classType = classType;
@@ -39,6 +49,7 @@ public final class ClassNode {
         this.annotations = Collections.unmodifiableList(new ArrayList<String>(annotations));
         this.packageName = packageName;
         this.lineNumber = lineNumber;
+        this.sourceFilePath = sourceFilePath;
     }
 
     public String getFqn() { return fqn; }
@@ -52,6 +63,7 @@ public final class ClassNode {
     public List<String> getAnnotations() { return annotations; }
     public String getPackageName() { return packageName; }
     public int getLineNumber() { return lineNumber; }
+    public String getSourceFilePath() { return sourceFilePath; }
 
     @Override
     public boolean equals(Object o) {
