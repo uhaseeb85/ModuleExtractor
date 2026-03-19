@@ -1,11 +1,12 @@
 import { BrowserRouter, Link, Route, Routes, useLocation } from 'react-router-dom'
 import { useState, useEffect } from 'react'
-import { LayoutDashboard, Puzzle, Sun, Moon, Boxes, Home } from 'lucide-react'
+import { LayoutDashboard, Puzzle, Sun, Moon, Boxes, Home, Sparkles, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Dashboard from './pages/Dashboard'
 import CandidatesPage from './pages/CandidatesPage'
 import LandingPage from './pages/LandingPage'
 import SyncStatusBadge from './components/SyncStatusBadge'
+import { AnalysisModeProvider, useAnalysisMode } from './context/AnalysisModeContext'
 
 const NAV_ITEMS = [
   { to: '/',           label: 'Home',                   icon: Home            },
@@ -15,6 +16,7 @@ const NAV_ITEMS = [
 
 function Sidebar({ dark, toggleDark }: { dark: boolean; toggleDark: () => void }) {
   const location = useLocation()
+  const { mode, aiAvailable, checkingAi } = useAnalysisMode()
   return (
     <aside className="flex h-screen w-58 shrink-0 flex-col bg-background border-r border-border/60">
       {/* Logo */}
@@ -56,6 +58,19 @@ function Sidebar({ dark, toggleDark }: { dark: boolean; toggleDark: () => void }
       {/* Footer */}
       <div className="border-t border-border/60 p-3 space-y-2">
         <SyncStatusBadge />
+        {/* Analysis mode badge */}
+        <div className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs text-muted-foreground">
+          {mode === 'ai' ? <Sparkles className="h-3.5 w-3.5 text-primary" /> : <BarChart3 className="h-3.5 w-3.5" />}
+          <span className="flex-1">
+            {mode === 'ai' ? 'AI Mode' : mode === 'demo' ? 'Demo Mode' : 'Static Mode'}
+          </span>
+          {mode === 'ai' && (
+            <span className={cn(
+              'h-2 w-2 rounded-full',
+              checkingAi ? 'bg-amber-400 animate-pulse' : aiAvailable ? 'bg-emerald-500' : 'bg-red-400',
+            )} />
+          )}
+        </div>
         <button
           onClick={toggleDark}
           className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:neu-flat transition-all duration-150"
@@ -70,15 +85,17 @@ function Sidebar({ dark, toggleDark }: { dark: boolean; toggleDark: () => void }
 
 function AppShell({ dark, toggleDark }: { dark: boolean; toggleDark: () => void }) {
   return (
-    <div className="flex h-screen bg-background">
-      <Sidebar dark={dark} toggleDark={toggleDark} />
-      <main className="flex-1 min-h-0 overflow-hidden bg-background">
-        <Routes>
-          <Route path="/dashboard"  element={<Dashboard />} />
-          <Route path="/candidates" element={<CandidatesPage />} />
-        </Routes>
-      </main>
-    </div>
+    <AnalysisModeProvider>
+      <div className="flex h-screen bg-background">
+        <Sidebar dark={dark} toggleDark={toggleDark} />
+        <main className="flex-1 min-h-0 overflow-hidden bg-background">
+          <Routes>
+            <Route path="/dashboard"  element={<Dashboard />} />
+            <Route path="/candidates" element={<CandidatesPage />} />
+          </Routes>
+        </main>
+      </div>
+    </AnalysisModeProvider>
   )
 }
 

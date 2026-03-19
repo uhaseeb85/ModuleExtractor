@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import ModelSelector from '@/components/ModelSelector'
-import { getApiKey, setApiKey, hasAiConfig } from '@/api/ai-config'
+import { getApiKey, setApiKey, hasAiConfig, setAnalysisMode } from '@/api/ai-config'
 
 interface Props {
   dark: boolean
@@ -311,7 +311,7 @@ export default function LandingPage({ dark, toggleDark }: Props) {
                 size="lg"
                 className="w-full gap-2 rounded-xl text-base"
                 disabled={!canLaunch}
-                onClick={() => navigate('/dashboard')}
+                onClick={() => { setAnalysisMode(strategy); navigate('/dashboard') }}
               >
                 Launch App <ArrowRight className="h-4.5 w-4.5" />
               </Button>

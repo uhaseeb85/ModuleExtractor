@@ -1,8 +1,10 @@
 /** Shared request helper — always hits /api (proxied by Vite dev server or Nginx in prod). */
 const BASE = '/api/v1'
 
-async function request<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`)
+async function request<T>(path: string, extraHeaders?: Record<string, string>): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: extraHeaders,
+  })
   if (!res.ok) {
     // Try to extract a structured error message from JSON response body
     const body = await res.json().catch(() => null) as Record<string, string> | null
@@ -172,6 +174,18 @@ export interface AiAnalysisResponse {
   error: string | null
 }
 
+export interface AiHealthResponse {
+  available: boolean
+  latencyMs: number
+  error: string | null
+}
+
+export interface AiPipelineResponse {
+  boundaries: AiAnalysisResponse
+  migration: AiAnalysisResponse
+  contexts: AiAnalysisResponse
+}
+
 /** Payload for scanning a local directory for Git repositories. */
 export interface ScanDirectoryRequest {
   /** Absolute path to scan (may be a single repo or a directory of repos). */
@@ -287,6 +301,9 @@ export const api = {
 
   // ── AI ──────────────────────────────────────────────────────────────
 
+  aiHealthCheck: (apiKey: string) =>
+    request<AiHealthResponse>('/ai/health', { 'X-OpenRouter-Key': apiKey }),
+
   getAiModels: (apiKey: string) => {
     const res = fetch(`${BASE}/ai/models`, {
       headers: { 'X-OpenRouter-Key': apiKey },
@@ -308,6 +325,9 @@ export const api = {
 
   aiOptimiseWeights: (apiKey: string, body: AiAnalysisRequest) =>
     send<AiAnalysisResponse>('POST', '/ai/optimise-weights', body, { 'X-OpenRouter-Key': apiKey }),
+
+  aiRunPipeline: (apiKey: string, body: AiAnalysisRequest) =>
+    send<AiPipelineResponse>('POST', '/ai/pipeline', body, { 'X-OpenRouter-Key': apiKey }),
 }
 
 function toQuery(params?: Record<string, string | boolean | undefined>): string {

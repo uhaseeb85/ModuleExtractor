@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import {
   api,
@@ -7,8 +7,11 @@ import {
   type ScaffoldPreviewResponse,
   type AiAnalysisRequest,
   type AiAnalysisResponse,
+  type AiPipelineResponse,
 } from '../api/client'
 import { getApiKey, getModelId, hasAiConfig } from '../api/ai-config'
+import { useAnalysisMode } from '../context/AnalysisModeContext'
+import { AiPipelinePanel, AiResultPanel } from '@/components/ai/AiPanels'
 import {
   Search, RefreshCw, AlertTriangle, Package, ChevronDown,
   ChevronRight, Layers, ArrowDownLeft, ArrowUpRight, Box,
@@ -120,71 +123,23 @@ function ModuleItem({
 // -- Tab types -----------------------------------------------------------------
 type DetailTab = 'overview' | 'structure' | 'spring' | 'ai'
 
-// -- AI result panel -----------------------------------------------------------
-function AiResultPanel({ result, loading }: { result: AiAnalysisResponse | null; loading: boolean }) {
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full gap-2 text-muted-foreground text-sm">
-        <Loader2 className="h-4 w-4 animate-spin" /> Running AI analysis...
-      </div>
-    )
-  }
-  if (!result) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-center px-6">
-        <div className="rounded-full neu-flat p-4 mb-4">
-          <Sparkles className="h-8 w-8 text-muted-foreground/50" />
-        </div>
-        <p className="text-sm font-medium text-muted-foreground">No AI analysis yet</p>
-        <p className="mt-1 text-xs text-muted-foreground/60">
-          Use the AI buttons in the toolbar to run an analysis on the selected module
-        </p>
-      </div>
-    )
-  }
-  if (result.error) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-3 text-sm px-6 text-center">
-        <div className="rounded-full bg-destructive/10 p-3">
-          <AlertTriangle className="h-5 w-5 text-destructive" />
-        </div>
-        <p className="font-medium text-foreground">Analysis failed</p>
-        <p className="text-xs text-muted-foreground max-w-md">{result.error}</p>
-      </div>
-    )
-  }
-  return (
-    <div className="h-full overflow-y-auto p-6 space-y-4">
-      {/* Token usage */}
-      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-        <Badge variant="secondary" className="text-[10px]">{result.modelUsed}</Badge>
-        {(result.promptTokens != null || result.completionTokens != null) && (
-          <span>
-            {result.promptTokens ?? 0} + {result.completionTokens ?? 0} tokens
-          </span>
-        )}
-      </div>
-      {/* Content */}
-      <div className="rounded-xl neu-raised-sm p-4">
-        <pre className="whitespace-pre-wrap text-xs text-foreground font-mono leading-relaxed">
-          {result.content}
-        </pre>
-      </div>
-    </div>
-  )
-}
-
 // -- Detail panel (tabbed) -----------------------------------------------------
 function DetailPanel({
   mod,
   params,
   aiResult,
   aiLoading,
+  pipelineResult,
+  pipelineLoading,
+  isAiMode,
 }: {
   mod: ModuleRecommendationResponse
   params: { groupDepth: number; minScore: number }
   aiResult: AiAnalysisResponse | null
   aiLoading: boolean
+  pipelineResult: AiPipelineResponse | null
+  pipelineLoading: boolean
+  isAiMode: boolean
 }) {
   const [tab, setTab] = useState<DetailTab>('overview')
   const [selectedFile, setSelectedFile] = useState<ProjectTreeNodeResponse | null>(null)
@@ -214,7 +169,7 @@ function DetailPanel({
     { key: 'overview',  label: 'Overview',          icon: Box },
     { key: 'structure', label: 'Project Structure', icon: FolderTree },
     { key: 'spring',    label: 'Spring Context',    icon: Shield },
-    { key: 'ai',        label: 'AI Analysis',       icon: Sparkles },
+    { key: 'ai',        label: isAiMode ? 'AI Insights' : 'AI Analysis', icon: Sparkles },
   ]
 
   return (
@@ -289,7 +244,11 @@ function DetailPanel({
           />
         )}
         {tab === 'spring'    && <SpringTab scaffold={scaffold ?? null} loading={scaffoldLoading} error={scaffoldError ? scaffoldErrorObj : null} />}
-        {tab === 'ai'        && <AiResultPanel result={aiResult} loading={aiLoading} />}
+        {tab === 'ai'        && (
+          isAiMode
+            ? <AiPipelinePanel result={pipelineResult} loading={pipelineLoading} />
+            : <AiResultPanel result={aiResult} loading={aiLoading} />
+        )}
       </div>
     </div>
   )
@@ -605,8 +564,12 @@ export default function CandidatesPage() {
   const [selected,   setSelected]   = useState<ModuleRecommendationResponse | null>(null)
   const [params,     setParams]     = useState({ groupDepth: 3, minScore: 0.3 })
   const [aiResult,   setAiResult]   = useState<AiAnalysisResponse | null>(null)
+  const [pipelineResult, setPipelineResult] = useState<AiPipelineResponse | null>(null)
 
+  const { mode, aiAvailable } = useAnalysisMode()
+  const isAiMode = mode === 'ai'
   const aiConfigured = hasAiConfig()
+  const lastTriggeredRef = useRef<string | null>(null)
 
   const { data: candidates, isLoading, refetch } = useQuery({
     queryKey:  ['recommendations', params.groupDepth, params.minScore],
@@ -627,9 +590,31 @@ export default function CandidatesPage() {
     onError: (err: Error) => setAiResult({ content: '', modelUsed: '', promptTokens: 0, completionTokens: 0, error: err.message }),
   })
 
+  const pipelineMutation = useMutation({
+    mutationFn: () => api.aiRunPipeline(getApiKey(), buildAiReq()),
+    onSuccess: (data) => setPipelineResult(data),
+    onError: (err: Error) => setPipelineResult({
+      boundaries: { content: '', modelUsed: '', promptTokens: 0, completionTokens: 0, error: err.message },
+      migration:  { content: '', modelUsed: '', promptTokens: 0, completionTokens: 0, error: err.message },
+      contexts:   { content: '', modelUsed: '', promptTokens: 0, completionTokens: 0, error: err.message },
+    }),
+  })
+
+  // Auto-trigger AI pipeline when in AI mode and a module is selected
+  useEffect(() => {
+    if (!isAiMode || !aiAvailable || !selected || !aiConfigured) return
+    const key = `${selected.repoName}:${selected.moduleName}`
+    if (lastTriggeredRef.current === key) return
+    lastTriggeredRef.current = key
+    setPipelineResult(null)
+    pipelineMutation.mutate()
+  }, [isAiMode, aiAvailable, selected, aiConfigured])
+
   const handleSelect = (mod: ModuleRecommendationResponse) => {
     setSelected(mod)
     setAiResult(null)
+    setPipelineResult(null)
+    lastTriggeredRef.current = null
   }
 
   const applyFilters = () => {
@@ -689,8 +674,8 @@ export default function CandidatesPage() {
           Refresh
         </Button>
 
-        {/* AI actions */}
-        {aiConfigured && selected && (
+        {/* AI actions — only in static mode; AI mode auto-triggers */}
+        {!isAiMode && aiConfigured && selected && (
           <div className="flex items-center gap-1 border-l pl-3 ml-1">
             <span className="text-[10px] text-muted-foreground mr-1">AI</span>
             {([
@@ -711,6 +696,16 @@ export default function CandidatesPage() {
                 {label}
               </Button>
             ))}
+          </div>
+        )}
+
+        {/* AI mode indicator */}
+        {isAiMode && selected && (
+          <div className="flex items-center gap-1.5 border-l pl-3 ml-1">
+            <Sparkles className="h-3.5 w-3.5 text-primary" />
+            <span className="text-[10px] text-muted-foreground">
+              {pipelineMutation.isPending ? 'AI pipeline running...' : aiAvailable ? 'AI auto-analysis' : 'AI unavailable'}
+            </span>
           </div>
         )}
 
@@ -765,7 +760,15 @@ export default function CandidatesPage() {
         {/* Right: detail */}
         <div className="flex-1 overflow-hidden bg-background">
           {selected ? (
-            <DetailPanel mod={selected} params={params} aiResult={aiResult} aiLoading={aiMutation.isPending} />
+            <DetailPanel
+              mod={selected}
+              params={params}
+              aiResult={aiResult}
+              aiLoading={aiMutation.isPending}
+              pipelineResult={pipelineResult}
+              pipelineLoading={pipelineMutation.isPending}
+              isAiMode={isAiMode}
+            />
           ) : (
             <div className="flex h-full flex-col items-center justify-center text-center px-6">
               <div className="rounded-full neu-flat p-4 mb-4">

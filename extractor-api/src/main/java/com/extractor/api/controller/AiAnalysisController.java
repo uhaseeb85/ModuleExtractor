@@ -2,9 +2,12 @@ package com.extractor.api.controller;
 
 import com.extractor.analysis.ai.AiAnalysisService;
 import com.extractor.analysis.ai.AiAnalysisService.AiResult;
+import com.extractor.analysis.ai.AiAnalysisService.PipelineResult;
 import com.extractor.analysis.ai.dto.OpenRouterModel;
 import com.extractor.api.dto.AiAnalysisRequest;
 import com.extractor.api.dto.AiAnalysisResponse;
+import com.extractor.api.dto.AiHealthResponse;
+import com.extractor.api.dto.AiPipelineResponse;
 import com.extractor.api.dto.AiModelDto;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -44,6 +47,34 @@ public class AiAnalysisController {
                 ))
                 .collect(Collectors.toList());
         return ResponseEntity.ok(dtos);
+    }
+
+    // ── Health check ──────────────────────────────────────────────────
+
+    @GetMapping("/health")
+    public ResponseEntity<AiHealthResponse> health(
+            @RequestHeader("X-OpenRouter-Key") String apiKey) {
+        long start = System.currentTimeMillis();
+        boolean available = aiService.checkHealth(apiKey);
+        long latency = System.currentTimeMillis() - start;
+        return ResponseEntity.ok(new AiHealthResponse(available, latency, available ? null : "API key invalid or service unreachable"));
+    }
+
+    // ── Full pipeline ─────────────────────────────────────────────────
+
+    @PostMapping("/pipeline")
+    public ResponseEntity<AiPipelineResponse> pipeline(
+            @RequestHeader("X-OpenRouter-Key") String apiKey,
+            @RequestBody AiAnalysisRequest req) {
+
+        PipelineResult result = aiService.runPipeline(
+                apiKey, req.getModel(), req.getModuleName(),
+                req.getGroupDepth(), req.getMinScore());
+        return ResponseEntity.ok(new AiPipelineResponse(
+                toDto(result.getBoundaries()),
+                toDto(result.getMigration()),
+                toDto(result.getContexts())
+        ));
     }
 
     // ── AI Capabilities ───────────────────────────────────────────────
@@ -90,19 +121,23 @@ public class AiAnalysisController {
         return toResponse(result);
     }
 
-    // ── Helper ────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────
 
     private ResponseEntity<AiAnalysisResponse> toResponse(AiResult result) {
-        AiAnalysisResponse resp = new AiAnalysisResponse(
+        AiAnalysisResponse resp = toDto(result);
+        if (result.hasError()) {
+            return ResponseEntity.badRequest().body(resp);
+        }
+        return ResponseEntity.ok(resp);
+    }
+
+    private AiAnalysisResponse toDto(AiResult result) {
+        return new AiAnalysisResponse(
                 result.getContent(),
                 result.getModelUsed(),
                 result.getPromptTokens(),
                 result.getCompletionTokens(),
                 result.getError()
         );
-        if (result.hasError()) {
-            return ResponseEntity.badRequest().body(resp);
-        }
-        return ResponseEntity.ok(resp);
     }
 }

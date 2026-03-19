@@ -33,6 +33,50 @@ public class AiAnalysisService {
     }
 
     /**
+     * Checks connectivity to OpenRouter by listing models.
+     * Returns true if the API key is valid and the service is reachable.
+     */
+    public boolean checkHealth(String apiKey) {
+        try {
+            List<OpenRouterModel> models = openRouter.listModels(apiKey);
+            return models != null && !models.isEmpty();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Runs the full AI analysis pipeline for a specific module:
+     * refineBoundaries + migrationPlan, then boundedContexts globally.
+     */
+    public PipelineResult runPipeline(String apiKey, String model, String moduleName,
+                                       int groupDepth, double minScore) {
+        AiResult boundaries = refineBoundaries(apiKey, model, moduleName, groupDepth, minScore);
+        AiResult migration = migrationPlan(apiKey, model, moduleName, groupDepth, minScore);
+        AiResult contexts = boundedContexts(apiKey, model, groupDepth, minScore);
+        return new PipelineResult(boundaries, migration, contexts);
+    }
+
+    /**
+     * Container for full pipeline results.
+     */
+    public static final class PipelineResult {
+        private final AiResult boundaries;
+        private final AiResult migration;
+        private final AiResult contexts;
+
+        public PipelineResult(AiResult boundaries, AiResult migration, AiResult contexts) {
+            this.boundaries = boundaries;
+            this.migration = migration;
+            this.contexts = contexts;
+        }
+
+        public AiResult getBoundaries() { return boundaries; }
+        public AiResult getMigration() { return migration; }
+        public AiResult getContexts() { return contexts; }
+    }
+
+    /**
      * AI capability 1: Refine extraction boundaries for a specific module.
      */
     public AiResult refineBoundaries(String apiKey, String model, String moduleName,
