@@ -31,7 +31,7 @@ export default function GraphPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Toolbar */}
-      <div className="flex shrink-0 items-center gap-3 border-b bg-card/50 px-6 py-3">
+      <div className="flex shrink-0 items-center gap-3 border-b bg-background px-6 py-3">
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Filter className="h-3.5 w-3.5" />
           <span>Filter</span>
@@ -88,7 +88,7 @@ export default function GraphPage() {
             </p>
           </div>
         ) : (
-          <div className="absolute inset-2 overflow-hidden rounded-xl border bg-card shadow-sm">
+          <div className="absolute inset-2 overflow-hidden rounded-2xl neu-raised">
             <GraphCanvas nodes={nodes ?? []} edges={edges ?? []} />
           </div>
         )}

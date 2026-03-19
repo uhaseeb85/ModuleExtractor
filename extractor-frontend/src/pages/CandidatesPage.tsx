@@ -16,7 +16,7 @@ function Ring({ score, size = 40 }: { score: number; size?: number }) {
   const circ = 2 * Math.PI * r
   const clamp = Math.max(0, Math.min(1, score))
   const color =
-    clamp >= 0.65 ? '#10b981' :
+    clamp >= 0.65 ? 'hsl(var(--primary))' :
     clamp >= 0.45 ? '#f59e0b' : '#6b7280'
 
   return (
@@ -47,7 +47,7 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
         <span className="text-xs text-muted-foreground">{label}</span>
         <span className="text-xs font-semibold tabular-nums">{pct}%</span>
       </div>
-      <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+      <div className="h-1.5 rounded-full neu-inset-sm overflow-hidden">
         <div className={cn('h-full rounded-full transition-all duration-500', color)}
           style={{ width: `${pct}%` }} />
       </div>
@@ -146,7 +146,7 @@ function DetailPanel({ mod }: { mod: ModuleRecommendationResponse }) {
             { label: 'Inbound',  value: mod.totalInboundDeps,  icon: ArrowDownLeft},
             { label: 'Outbound', value: mod.totalOutboundDeps, icon: ArrowUpRight },
           ].map(({ label, value, icon: Icon }) => (
-            <div key={label} className="rounded-xl border bg-card p-3 text-center">
+            <div key={label} className="rounded-xl neu-raised-sm p-3 text-center">
               <Icon className="mx-auto mb-1 h-4 w-4 text-muted-foreground" />
               <p className="text-xl font-bold text-foreground">{value ?? '�'}</p>
               <p className="text-xs text-muted-foreground">{label}</p>
@@ -155,7 +155,7 @@ function DetailPanel({ mod }: { mod: ModuleRecommendationResponse }) {
         </div>
 
         {/* Score bars */}
-        <div className="rounded-xl border bg-card p-4 space-y-4">
+        <div className="rounded-xl neu-raised-sm p-4 space-y-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Scores
           </h3>
@@ -187,10 +187,10 @@ function DetailPanel({ mod }: { mod: ModuleRecommendationResponse }) {
 
         {/* Packages */}
         {mod.packages?.length > 0 && (
-          <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="rounded-xl neu-raised-sm overflow-hidden">
             <button
               onClick={() => setShowPkg((v) => !v)}
-              className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
+              className="w-full flex items-center gap-2 px-4 py-3 text-left hover:neu-flat transition-all"
             >
               <Package className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium text-foreground flex-1">Packages</span>
@@ -211,10 +211,10 @@ function DetailPanel({ mod }: { mod: ModuleRecommendationResponse }) {
 
         {/* Classes */}
         {mod.classes?.length > 0 && (
-          <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="rounded-xl neu-raised-sm overflow-hidden">
             <button
               onClick={() => setShowCls((v) => !v)}
-              className="w-full flex items-center gap-2 px-4 py-3 text-left hover:bg-muted/30 transition-colors"
+              className="w-full flex items-center gap-2 px-4 py-3 text-left hover:neu-flat transition-all"
             >
               <Layers className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium text-foreground flex-1">Classes</span>
@@ -232,7 +232,7 @@ function DetailPanel({ mod }: { mod: ModuleRecommendationResponse }) {
                       <span
                         key={cls}
                         title={cls}
-                        className="inline-block rounded-md bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground"
+                        className="inline-block rounded-md neu-flat px-2 py-0.5 font-mono text-xs text-muted-foreground"
                       >
                         {short}
                       </span>
@@ -278,7 +278,7 @@ export default function CandidatesPage() {
   return (
     <div className="flex h-full flex-col">
       {/* Toolbar */}
-      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b bg-card/50 px-6 py-3">
+      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b bg-background px-6 py-3">
         <div className="relative flex-1 min-w-40 max-w-64">
           <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -337,7 +337,7 @@ export default function CandidatesPage() {
       {/* Master-detail split */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Left: module list */}
-        <div className="w-80 shrink-0 border-r flex flex-col overflow-hidden">
+        <div className="w-80 shrink-0 border-r border-border/60 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto">
             {isLoading ? (
               <div className="space-y-px p-2">
@@ -372,7 +372,7 @@ export default function CandidatesPage() {
             <DetailPanel mod={selected} />
           ) : (
             <div className="flex h-full flex-col items-center justify-center text-center px-6">
-              <div className="rounded-full bg-muted p-4 mb-4">
+              <div className="rounded-full neu-flat p-4 mb-4">
                 <Layers className="h-8 w-8 text-muted-foreground/50" />
               </div>
               <p className="text-sm font-medium text-muted-foreground">Select a module</p>

@@ -84,7 +84,7 @@ export default function ReposPage() {
 
         {/* Scan directory inline form */}
         {showScan && (
-          <div className="flex items-center gap-3 rounded-xl border border-dashed bg-accent/30 p-4">
+          <div className="flex items-center gap-3 rounded-xl neu-inset p-4">
             <FolderSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
             <input
               type="text"
@@ -109,7 +109,7 @@ export default function ReposPage() {
             ))}
           </div>
         ) : repos?.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
+          <div className="flex flex-col items-center justify-center rounded-2xl neu-inset py-16 text-center">
             <GitFork className="mb-3 h-10 w-10 text-muted-foreground/30" />
             <p className="text-sm font-medium text-muted-foreground">No repositories added yet</p>
             <p className="mt-1 text-xs text-muted-foreground/60">
@@ -121,10 +121,10 @@ export default function ReposPage() {
             </div>
           </div>
         ) : (
-          <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="rounded-2xl neu-raised overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/40">
+                <tr className="border-b bg-muted/30">
                   <th className="py-2.5 pl-4 pr-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Repository</th>
                   <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Build</th>
                   <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Branch</th>
@@ -155,7 +155,7 @@ export default function ReposPage() {
                     <td className="px-3 py-3.5 text-right font-medium text-foreground">{r.nodeCount}</td>
                     <td className="pl-3 pr-4 py-3.5">
                       {syncingRow === r.name ? (
-                        <span className="flex items-center gap-1.5 text-xs text-indigo-500">
+                        <span className="flex items-center gap-1.5 text-xs text-primary">
                           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Syncing�
                         </span>
                       ) : r.syncedAt ? (

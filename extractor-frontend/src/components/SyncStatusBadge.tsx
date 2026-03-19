@@ -33,23 +33,23 @@ export default function SyncStatusBadge() {
         <div className="px-2 space-y-1">
           {isRunning && (
             <>
-              <div className="flex items-center justify-between text-[10px] text-slate-400">
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
                   Syncing
                 </span>
                 <span>{job.progressPercent}%</span>
               </div>
-              <div className="h-1 rounded-full bg-slate-700 overflow-hidden">
+              <div className="h-1 rounded-full neu-inset-sm overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-indigo-500 transition-all duration-500"
+                  className="h-full rounded-full bg-primary transition-all duration-500"
                   style={{ width: `${job.progressPercent}%` }}
                 />
               </div>
             </>
           )}
           {isDone && (
-            <p className="flex items-center gap-1 text-[10px] text-emerald-400">
+            <p className="flex items-center gap-1 text-[10px] text-teal-500 dark:text-teal-400">
               <CheckCircle2 className="h-3 w-3" /> Sync complete
             </p>
           )}
@@ -69,7 +69,7 @@ export default function SyncStatusBadge() {
       <button
         onClick={handleSync}
         disabled={isRunning}
-        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:text-slate-600 disabled:cursor-not-allowed transition-colors"
+        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs text-muted-foreground hover:neu-flat hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed transition-all"
       >
         <RefreshCw className="h-3.5 w-3.5 [.disabled_&]:animate-spin" />
         {isRunning ? 'Syncing...' : 'Sync All'}

@@ -9,21 +9,21 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
 function StatCard({
-  label, value, icon: Icon, color, sub,
+  label, value, icon: Icon, sub,
 }: {
   label: string; value: string | number; icon: React.ElementType
-  color: string; sub?: string
+  color?: string; sub?: string
 }) {
   return (
-    <div className="rounded-xl border bg-card p-5">
+    <div className="rounded-2xl neu-raised p-5">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
           <p className="mt-1.5 text-3xl font-bold text-foreground">{value}</p>
           {sub && <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>}
         </div>
-        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${color}`}>
-          <Icon className="h-5 w-5" />
+        <div className="flex h-10 w-10 items-center justify-center rounded-xl neu-raised-sm">
+          <Icon className="h-5 w-5 text-primary" />
         </div>
       </div>
     </div>
@@ -61,30 +61,26 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatCard
             label="Repositories"
-            value={repos?.length ?? '�'}
+            value={repos?.length ?? '–'}
             icon={GitFork}
-            color="bg-indigo-100 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400"
             sub={synced.length > 0 ? `${synced.length} synced` : undefined}
           />
           <StatCard
             label="Total Nodes"
-            value={totalNodes || '�'}
+            value={totalNodes || '–'}
             icon={Box}
-            color="bg-violet-100 text-violet-600 dark:bg-violet-950 dark:text-violet-400"
             sub="classes, interfaces, enums"
           />
           <StatCard
             label="Shared Entities"
-            value={sharedEntities?.length ?? '�'}
+            value={sharedEntities?.length ?? '–'}
             icon={Share2}
-            color="bg-sky-100 text-sky-600 dark:bg-sky-950 dark:text-sky-400"
             sub="cross-repo references"
           />
           <StatCard
             label="Cross-Repo Risks"
-            value={sharedEntities?.length ?? '�'}
+            value={sharedEntities?.length ?? '–'}
             icon={AlertTriangle}
-            color="bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400"
             sub="require attention"
           />
         </div>
@@ -107,7 +103,7 @@ export default function Dashboard() {
               ))}
             </div>
           ) : repos?.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-12 text-center">
+            <div className="flex flex-col items-center justify-center rounded-2xl neu-inset py-12 text-center">
               <GitFork className="mb-3 h-8 w-8 text-muted-foreground/40" />
               <p className="text-sm font-medium text-muted-foreground">No repositories yet</p>
               <p className="mt-1 text-xs text-muted-foreground/70">Go to Repositories to add your first repo</p>
@@ -116,7 +112,7 @@ export default function Dashboard() {
               </Button>
             </div>
           ) : (
-            <div className="rounded-xl border bg-card overflow-hidden">
+            <div className="rounded-2xl neu-raised overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/40">
@@ -175,7 +171,7 @@ export default function Dashboard() {
               {sharedEntities.slice(0, 10).map((e) => (
                 <div
                   key={e.fqn}
-                  className="flex items-center gap-3 rounded-lg border bg-card px-4 py-2.5"
+                  className="flex items-center gap-3 rounded-xl neu-raised-sm px-4 py-2.5"
                 >
                   <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-amber-500" />
                   <span className="font-medium text-sm text-foreground">{e.simpleName}</span>
@@ -193,7 +189,7 @@ export default function Dashboard() {
 
         {/* No-data guidance */}
         {!isLoading && repos?.length === 0 && (
-          <section className="rounded-xl border border-dashed bg-accent/20 p-6 space-y-3">
+          <section className="rounded-2xl neu-inset p-6 space-y-3">
             <h3 className="font-semibold text-foreground">Getting Started</h3>
             <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
               <li>Add a Git repository in <strong>Repositories</strong></li>
