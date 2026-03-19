@@ -1,10 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, CheckCircle2, XCircle } from 'lucide-react'
 import { api, type SyncJobResponse } from '../api/client'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 export default function SyncStatusBadge() {
   const [jobId, setJobId] = useState<string | null>(null)
@@ -15,65 +12,68 @@ export default function SyncStatusBadge() {
     enabled: !!jobId,
     refetchInterval: (query) => {
       const s = query.state.data?.status
-      return s === 'RUNNING' || s === 'PENDING' ? 2000 : false
+      return s === 'RUNNING' || s === 'PENDING' ? 1500 : false
     },
   })
 
   const handleSync = async () => {
-    const resp = await api.triggerFullSync()
-    if (resp?.jobId) setJobId(resp.jobId)
+    try {
+      const resp = await api.triggerFullSync()
+      if (resp?.jobId) setJobId(resp.jobId)
+    } catch { /* ignore */ }
   }
 
   const isRunning = job?.status === 'RUNNING' || job?.status === 'PENDING'
+  const isDone    = job?.status === 'COMPLETED'
+  const isFailed  = job?.status === 'FAILED'
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="space-y-1.5 px-1">
       {job && (
-        <div className="flex flex-col items-end gap-1">
-          <Badge
-            variant={
-              job.status === 'COMPLETED' ? 'default' :
-              job.status === 'FAILED' ? 'destructive' :
-              'secondary'
-            }
-            className={cn(
-              'gap-1.5',
-              isRunning && 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
-            )}
-          >
-            {isRunning && (
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
-              </span>
-            )}
-            {job.status}
-            {isRunning && ` ${job.progressPercent}%`}
-          </Badge>
-          {job.warnings?.length > 0 && job.status === 'COMPLETED' && (
-            <span className="max-w-xs truncate text-right text-xs text-amber-600 dark:text-amber-400"
-              title={job.warnings.join('\n')}>
-              ⚠ {job.warnings[0]}
-            </span>
+        <div className="px-2 space-y-1">
+          {isRunning && (
+            <>
+              <div className="flex items-center justify-between text-[10px] text-slate-400">
+                <span className="flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  Syncing
+                </span>
+                <span>{job.progressPercent}%</span>
+              </div>
+              <div className="h-1 rounded-full bg-slate-700 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-indigo-500 transition-all duration-500"
+                  style={{ width: `${job.progressPercent}%` }}
+                />
+              </div>
+            </>
           )}
-          {job.errors?.length > 0 && (
-            <span className="max-w-xs truncate text-right text-xs text-destructive"
-              title={job.errors.join('\n')}>
-              {job.errors[0]}
-            </span>
+          {isDone && (
+            <p className="flex items-center gap-1 text-[10px] text-emerald-400">
+              <CheckCircle2 className="h-3 w-3" /> Sync complete
+            </p>
+          )}
+          {isFailed && (
+            <p className="flex items-center gap-1 text-[10px] text-red-400">
+              <XCircle className="h-3 w-3" />
+              {job.errors[0] ? job.errors[0].substring(0, 40) : 'Sync failed'}
+            </p>
+          )}
+          {isDone && job.warnings?.length > 0 && (
+            <p className="text-[10px] text-amber-400 truncate" title={job.warnings[0]}>
+              {job.warnings[0]}
+            </p>
           )}
         </div>
       )}
-      <Button
-        variant="outline"
-        size="sm"
+      <button
         onClick={handleSync}
         disabled={isRunning}
-        className="h-8 gap-1.5 text-xs"
+        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-xs text-slate-400 hover:bg-slate-800 hover:text-slate-200 disabled:text-slate-600 disabled:cursor-not-allowed transition-colors"
       >
-        <RefreshCw className={cn('h-3 w-3', isRunning && 'animate-spin')} />
-        Sync All
-      </Button>
+        <RefreshCw className="h-3.5 w-3.5 [.disabled_&]:animate-spin" />
+        {isRunning ? 'Syncing...' : 'Sync All'}
+      </button>
     </div>
   )
 }

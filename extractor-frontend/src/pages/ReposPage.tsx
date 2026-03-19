@@ -1,217 +1,210 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, SyncJobResponse } from '../api/client'
-import { Plus, FolderOpen, RefreshCw, Trash2 } from 'lucide-react'
+import { api } from '../api/client'
 import AddRepoModal from '../components/AddRepoModal'
-import ScanDirectoryModal from '../components/ScanDirectoryModal'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import {
+  Plus, FolderSearch, RefreshCw, Trash2, GitFork,
+  Clock, Loader2
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 export default function ReposPage() {
-  const queryClient = useQueryClient()
-  const [showAddModal, setShowAddModal] = useState(false)
-  const [showScanModal, setShowScanModal] = useState(false)
-  const [jobs, setJobs] = useState<Record<string, SyncJobResponse>>({})
+  const qc = useQueryClient()
+  const [showAdd, setShowAdd] = useState(false)
+  const [scanPath, setScanPath] = useState('')
+  const [showScan, setShowScan] = useState(false)
+  const [syncingRow, setSyncingRow] = useState<string | null>(null)
 
-  const { data: repos = [], isLoading } = useQuery({
+  const { data: repos, isLoading } = useQuery({
     queryKey: ['repos'],
     queryFn: api.getRepos,
   })
 
-  const removeMutation = useMutation({
-    mutationFn: (name: string) => api.removeRepo(name),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['repos'] }),
+  const syncRowMut = useMutation({
+    mutationFn: (name: string) => api.triggerRepoSync(name),
+    onMutate: (name) => setSyncingRow(name),
+    onSettled: () => {
+      setSyncingRow(null)
+      qc.invalidateQueries({ queryKey: ['repos'] })
+    },
   })
 
-  const pollJobs = useCallback(async () => {
-    const running = Object.entries(jobs).filter(
-      ([, j]) => j.status === 'RUNNING' || j.status === 'PENDING'
-    )
-    if (running.length === 0) return
-    await Promise.all(
-      running.map(async ([repoName, j]) => {
-        try {
-          const updated = await api.getJobStatus(j.jobId)
-          setJobs((prev) => ({ ...prev, [repoName]: updated }))
-          if (updated.status === 'COMPLETED') {
-            queryClient.invalidateQueries({ queryKey: ['repos'] })
-          }
-        } catch {
-          // ignore transient poll errors
-        }
-      })
-    )
-  }, [jobs, queryClient])
+  const deleteMut = useMutation({
+    mutationFn: (name: string) => api.removeRepo(name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['repos'] }),
+  })
 
-  useEffect(() => {
-    const id = setInterval(pollJobs, 1500)
-    return () => clearInterval(id)
-  }, [pollJobs])
+  const syncAllMut = useMutation({
+    mutationFn: () => api.triggerFullSync(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['repos'] }),
+  })
 
-  const startSync = async (repoName: string) => {
-    try {
-      const job = await api.triggerRepoSync(repoName)
-      setJobs((prev) => ({ ...prev, [repoName]: job }))
-    } catch (err) {
-      alert(`Failed to start sync: ${(err as Error).message}`)
-    }
-  }
-
-  const startSyncAll = async () => {
-    try {
-      const job = await api.triggerFullSync()
-      setJobs((prev) => ({ ...prev, ['__all__']: job }))
-    } catch (err) {
-      alert(`Failed to start sync: ${(err as Error).message}`)
-    }
-  }
-
-  const jobFor = (name: string) => jobs[name] ?? jobs['__all__'] ?? null
+  const scanMut = useMutation({
+    mutationFn: (path: string) =>
+      api.scanDirectory({ directoryPath: path, buildTool: 'MAVEN', branch: 'main' }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['repos'] })
+      setShowScan(false)
+      setScanPath('')
+    },
+  })
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Repositories</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Manage registered repositories and trigger sync operations
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {repos.length > 0 && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={startSyncAll}
-              disabled={jobs['__all__']?.status === 'RUNNING'}
-              className="gap-1.5"
-            >
-              <RefreshCw className={cn('h-3.5 w-3.5', jobs['__all__']?.status === 'RUNNING' && 'animate-spin')} />
-              {jobs['__all__']?.status === 'RUNNING'
-                ? `Syncing all… ${jobs['__all__'].progressPercent}%`
-                : 'Sync All'}
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto max-w-5xl space-y-6 p-8">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Repositories</h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Manage and sync your Java repositories
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="gap-1.5"
+              disabled={syncAllMut.isPending}
+              onClick={() => syncAllMut.mutate()}>
+              {syncAllMut.isPending
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <RefreshCw className="h-3.5 w-3.5" />}
+              Sync All
             </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={() => setShowScanModal(true)} className="gap-1.5">
-            <FolderOpen className="h-3.5 w-3.5" />
-            Scan Directory
-          </Button>
-          <Button size="sm" onClick={() => setShowAddModal(true)} className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" />
-            Add Repository
-          </Button>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowScan(true)}>
+              <FolderSearch className="h-3.5 w-3.5" />
+              Scan Directory
+            </Button>
+            <Button size="sm" className="gap-1.5" onClick={() => setShowAdd(true)}>
+              <Plus className="h-3.5 w-3.5" />
+              Add Repo
+            </Button>
+          </div>
         </div>
+
+        {/* Scan directory inline form */}
+        {showScan && (
+          <div className="flex items-center gap-3 rounded-xl border border-dashed bg-accent/30 p-4">
+            <FolderSearch className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="/path/to/directory"
+              value={scanPath}
+              onChange={(e) => setScanPath(e.target.value)}
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
+            />
+            <Button size="sm" disabled={!scanPath || scanMut.isPending}
+              onClick={() => scanMut.mutate(scanPath)}>
+              {scanMut.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Scan'}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowScan(false)}>Cancel</Button>
+          </div>
+        )}
+
+        {/* Repos table */}
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1,2,3].map((i) => (
+              <div key={i} className="h-14 rounded-lg bg-muted animate-pulse" />
+            ))}
+          </div>
+        ) : repos?.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
+            <GitFork className="mb-3 h-10 w-10 text-muted-foreground/30" />
+            <p className="text-sm font-medium text-muted-foreground">No repositories added yet</p>
+            <p className="mt-1 text-xs text-muted-foreground/60">
+              Add a Git repo or scan a local directory to get started
+            </p>
+            <div className="mt-5 flex gap-2">
+              <Button size="sm" onClick={() => setShowAdd(true)}>Add Repo</Button>
+              <Button size="sm" variant="outline" onClick={() => setShowScan(true)}>Scan Directory</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-xl border bg-card overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/40">
+                  <th className="py-2.5 pl-4 pr-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Repository</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Build</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Branch</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-medium text-muted-foreground uppercase tracking-wide">Nodes</th>
+                  <th className="pl-3 pr-4 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Last Sync</th>
+                  <th className="pr-4 py-2.5" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {repos?.map((r) => (
+                  <tr key={r.name} className="hover:bg-muted/30 transition-colors group">
+                    <td className="py-3.5 pl-4 pr-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className={cn(
+                          'h-2 w-2 rounded-full shrink-0',
+                          r.syncedAt ? 'bg-emerald-500' : 'bg-muted-foreground/20',
+                        )} />
+                        <div>
+                          <p className="font-medium text-foreground">{r.name}</p>
+                          <p className="text-xs text-muted-foreground/70 font-mono truncate max-w-64">{r.url}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3.5">
+                      <Badge variant="secondary" className="text-xs">{r.buildTool}</Badge>
+                    </td>
+                    <td className="px-3 py-3.5 font-mono text-xs text-muted-foreground">{r.branch}</td>
+                    <td className="px-3 py-3.5 text-right font-medium text-foreground">{r.nodeCount}</td>
+                    <td className="pl-3 pr-4 py-3.5">
+                      {syncingRow === r.name ? (
+                        <span className="flex items-center gap-1.5 text-xs text-indigo-500">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" /> Syncing�
+                        </span>
+                      ) : r.syncedAt ? (
+                        <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {new Date(r.syncedAt).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground/50">Never synced</span>
+                      )}
+                    </td>
+                    <td className="pr-4 py-3.5">
+                      <div className="flex gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          disabled={syncRowMut.isPending}
+                          title="Sync"
+                          onClick={() => syncRowMut.mutate(r.name)}
+                        >
+                          {syncingRow === r.name
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : <RefreshCw className="h-3.5 w-3.5" />}
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                          title="Remove"
+                          onClick={() => {
+                            if (confirm(`Remove repository "${r.name}"?`)) {
+                              deleteMut.mutate(r.name)
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Multi-repo hint */}
-      {repos.length > 1 && (
-        <Card className="border-primary/20 bg-primary/5">
-          <CardContent className="px-4 py-2.5 text-xs text-primary">
-            {repos.length} repositories configured — cross-repo dependencies are linked
-            automatically during sync.
-          </CardContent>
-        </Card>
-      )}
-
-      {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : repos.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16 text-center">
-          <p className="mb-2 text-muted-foreground">No repositories registered yet.</p>
-          <Button onClick={() => setShowAddModal(true)} className="mt-2 gap-1.5">
-            <Plus className="h-4 w-4" />
-            Add Your First Repository
-          </Button>
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {repos.map((r) => {
-            const job = jobFor(r.name)
-            const isRunning = job?.status === 'RUNNING' || job?.status === 'PENDING'
-            const isFailed = job?.status === 'FAILED'
-            const isDone = job?.status === 'COMPLETED'
-            return (
-              <Card key={r.name} className="overflow-hidden">
-                <CardContent className="p-5">
-                  <div className="mb-2 flex items-center justify-between">
-                    <h2 className="font-semibold text-foreground">{r.name}</h2>
-                    <Badge variant="secondary">{r.buildTool}</Badge>
-                  </div>
-                  <p className="mb-1 break-all text-xs text-muted-foreground">{r.url}</p>
-                  <p className="mb-3 text-xs text-muted-foreground">
-                    Branch: {r.branch} · {r.nodeCount} nodes
-                  </p>
-                  <p className="mb-3 text-xs text-muted-foreground">
-                    Last sync:{' '}
-                    {r.syncedAt ? new Date(r.syncedAt).toLocaleString() : 'Never'}
-                  </p>
-
-                  {/* Job status */}
-                  {job && (
-                    <div className="mb-3">
-                      {isRunning && (
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-xs text-primary">
-                            <span>
-                              Syncing{job.currentRepo ? ` ${job.currentRepo}` : ''}…
-                            </span>
-                            <span>{job.progressPercent}%</span>
-                          </div>
-                          <Progress value={job.progressPercent} />
-                        </div>
-                      )}
-                      {isDone && (
-                        <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                          ✓ Sync completed
-                        </p>
-                      )}
-                      {isFailed && (
-                        <p className="text-xs text-destructive">
-                          ✗ Sync failed
-                          {job.errors[0] ? `: ${job.errors[0]}` : ''}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => startSync(r.name)}
-                      disabled={isRunning}
-                      className="gap-1.5"
-                    >
-                      <RefreshCw className={cn('h-3 w-3', isRunning && 'animate-spin')} />
-                      {isRunning ? 'Syncing…' : 'Sync'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm(`Remove "${r.name}" from analysis? (cloned files are kept)`)) {
-                          removeMutation.mutate(r.name)
-                        }
-                      }}
-                      disabled={removeMutation.isPending}
-                      className="gap-1.5 text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      Remove
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      )}
-
-      <AddRepoModal open={showAddModal} onClose={() => setShowAddModal(false)} />
-      <ScanDirectoryModal open={showScanModal} onClose={() => setShowScanModal(false)} />
+      {showAdd && <AddRepoModal open={showAdd} onClose={() => setShowAdd(false)} />}
     </div>
   )
 }
