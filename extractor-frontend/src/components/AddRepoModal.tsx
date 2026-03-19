@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, AddRepoRequest } from '../api/client'
+import { api, AddRepoRequest, RepoSummaryResponse } from '../api/client'
 import {
   Dialog,
   DialogContent,
@@ -50,6 +50,21 @@ export default function AddRepoModal({ open, onClose }: Props) {
   const mutation = useMutation({
     mutationFn: () => api.addRepo(form, syncNow),
     onSuccess: () => {
+      // Optimistically add the repo immediately so the list updates without
+      // waiting for the background refetch to complete.
+      queryClient.setQueryData<RepoSummaryResponse[]>(['repos'], (old) => [
+        ...(old ?? []),
+        {
+          name: form.name,
+          url: form.url,
+          branch: form.branch,
+          buildTool: form.buildTool,
+          lastSyncSha: null,
+          syncedAt: null,
+          nodeCount: 0,
+        },
+      ])
+      // Also invalidate so a background refetch brings accurate server data.
       queryClient.invalidateQueries({ queryKey: ['repos'] })
       setForm(EMPTY)
       setLocalPathTouched(false)
